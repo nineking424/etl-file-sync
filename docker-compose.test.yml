@@ -1,0 +1,46 @@
+version: '3.8'
+
+services:
+  # Source FTP Server (Pure-FTPd)
+  ftp-source:
+    image: stilliard/pure-ftpd:hardened
+    container_name: ftp-source
+    environment:
+      - PUBLICHOST=localhost
+      - FTP_USER_NAME=srcuser
+      - FTP_USER_PASS=srcpass
+      - FTP_USER_HOME=/home/srcuser
+      - FTP_PASSIVE_PORTS=30000:30009
+    ports:
+      - "2121:21"
+      - "30000-30009:30000-30009"
+    volumes:
+      - ftp-source-data:/home/srcuser
+    networks:
+      - etl-test-net
+
+  # Destination FTP Server (Pure-FTPd)
+  ftp-dest:
+    image: stilliard/pure-ftpd:hardened
+    container_name: ftp-dest
+    environment:
+      - PUBLICHOST=localhost
+      - FTP_USER_NAME=dstuser
+      - FTP_USER_PASS=dstpass
+      - FTP_USER_HOME=/home/dstuser
+      - FTP_PASSIVE_PORTS=30100:30109
+    ports:
+      - "2122:21"
+      - "30100-30109:30100-30109"
+    volumes:
+      - ftp-dest-data:/home/dstuser
+    networks:
+      - etl-test-net
+
+volumes:
+  ftp-source-data:
+  ftp-dest-data:
+
+networks:
+  etl-test-net:
+    driver: bridge
