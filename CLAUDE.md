@@ -15,6 +15,19 @@ Always use Context7 MCP tools when generating code, setting up configurations, o
 
 When creating new skills, use the `skill-creator` tool to generate the skill structure and files.
 
+## Parallel Work Strategy
+
+When parallel work is requested:
+- Use sub agents (Task tool) to handle multiple tasks concurrently
+- When tasks have no dependencies, actively consider using git worktree for independent workspaces
+- Each sub agent works in its own worktree branch, then merge results back to main
+
+### Git Worktree Workflow
+1. Create worktree: `git worktree add ../worktree-<task> -b <branch-name>`
+2. Sub agent works independently in the worktree
+3. Merge completed work back to main branch
+4. Clean up: `git worktree remove ../worktree-<task>`
+
 ## Development Workflow
 
 ### Feature Development Process
