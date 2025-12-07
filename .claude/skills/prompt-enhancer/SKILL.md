@@ -1,10 +1,6 @@
 ---
 name: prompt-enhancer
-description: |
-  Enhance backend development prompts by analyzing project context (architecture, dependencies, infrastructure, existing patterns).
-  Use when: (1) User provides brief requests like "API 만들어줘", "Kafka 연동해줘", "배치 작업 추가해줘",
-  (2) Request lacks implementation details, (3) Task requires understanding existing codebase architecture,
-  (4) Complex infrastructure integration is needed (K8s, Kafka, Airflow, DB).
+description: Enhance backend development prompts by analyzing project context (architecture, dependencies, infrastructure, existing patterns). Use when user provides brief requests, request lacks implementation details, or complex infrastructure integration is needed (K8s, Kafka, Airflow, DB).
 ---
 
 # Prompt Enhancer (Backend)

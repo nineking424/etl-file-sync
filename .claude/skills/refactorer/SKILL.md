@@ -1,10 +1,6 @@
 ---
 name: refactorer
-description: |
-  Improve code structure and quality through systematic refactoring.
-  Use when: (1) Reducing code complexity, (2) Eliminating duplication,
-  (3) Improving readability, (4) Applying design patterns,
-  (5) Breaking down large classes/methods, (6) Modernizing legacy code.
+description: Improve code structure and quality through systematic refactoring. Use when reducing complexity, eliminating duplication, improving readability, applying design patterns, breaking down large classes/methods, or modernizing legacy code.
 ---
 
 # Refactorer Skill
