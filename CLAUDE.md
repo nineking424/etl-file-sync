@@ -6,6 +6,11 @@ This file provides guidance to Claude Code (claude.ai/code) when working with co
 
 Always use Context7 MCP tools when generating code, setting up configurations, or providing library/API documentation. Automatically resolve library IDs and fetch documentation without requiring explicit user requests.
 
+## Language Guidelines
+
+- **Memory Files**: All memory files (CLAUDE.md, .claude/*, etc.) must be written in English
+- **Documentation Files**: All documentation files (README.md, docs/*, etc.) must be written in Korean (한글)
+
 ## Development Workflow
 
 ### Feature Development Process
