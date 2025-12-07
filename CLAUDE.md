@@ -13,5 +13,5 @@ All changes must be committed to git and pushed to the remote repository.
 ### Rules
 - **Mandatory Commit**: Every code change must be committed to git
 - **Mandatory Push**: Always push commits to the remote repository after committing
-- **Commit Messages**: Write clear, meaningful commit messages in English
+- **Commit Messages**: Write clear, meaningful commit messages in Korean (한글)
 - **Atomic Commits**: Make commits in logical units (one feature/fix per commit)
