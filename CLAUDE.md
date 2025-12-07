@@ -11,6 +11,10 @@ Always use Context7 MCP tools when generating code, setting up configurations, o
 - **Memory Files**: All memory files (CLAUDE.md, .claude/*, etc.) must be written in English
 - **Documentation Files**: All documentation files (README.md, docs/*, etc.) must be written in Korean (한글)
 
+## Skill Development
+
+When creating new skills, use the `skill-creator` tool to generate the skill structure and files.
+
 ## Development Workflow
 
 ### Feature Development Process
