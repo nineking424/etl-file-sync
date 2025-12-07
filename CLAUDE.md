@@ -14,17 +14,17 @@ Always use Context7 MCP tools when generating code, setting up configurations, o
 ## Development Workflow
 
 ### Feature Development Process
-1. **테스트 계획 수립**: 기능 요구사항에 맞는 테스트 케이스 정의
-2. **기능 개발**: 테스트를 통과할 수 있는 코드 구현
-3. **테스트 결과 확인**: 모든 테스트 통과 여부 검증
+1. **Test Planning**: Define test cases based on feature requirements
+2. **Feature Development**: Implement code to pass the tests
+3. **Test Verification**: Verify all tests pass
 
 ### Test Result in Commit
-테스트가 동반되는 작업의 경우, 커밋 메시지에 테스트 결과를 포함:
+When work involves tests, include test results in the commit message:
 ```
-feat: 사용자 인증 기능 추가
+feat: Add user authentication
 
-- JWT 토큰 기반 인증 구현
-- 로그인/로그아웃 API 추가
+- Implement JWT token-based authentication
+- Add login/logout API
 
 Test: 5 passed, 0 failed
 ```
@@ -47,17 +47,17 @@ All changes must be committed to git and pushed to the remote repository.
 ```
 
 **Type Prefixes:**
-- `feat`: 새로운 기능 추가
-- `fix`: 버그 수정
-- `docs`: 문서 변경
-- `refactor`: 코드 리팩토링 (기능 변경 없음)
-- `test`: 테스트 추가/수정
-- `chore`: 빌드, 설정 등 기타 변경
+- `feat`: Add new feature
+- `fix`: Bug fix
+- `docs`: Documentation changes
+- `refactor`: Code refactoring (no functional changes)
+- `test`: Add/modify tests
+- `chore`: Build, config, and other changes
 
 **Example:**
 ```
-feat: 사용자 인증 기능 추가
+feat: Add user authentication
 
-- JWT 토큰 기반 인증 구현
-- 로그인/로그아웃 API 추가
+- Implement JWT token-based authentication
+- Add login/logout API
 ```
