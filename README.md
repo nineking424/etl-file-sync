@@ -1,1 +1,308 @@
-# etl-file-sync
+# ETL File Sync
+
+Kafka 메시지 큐 기반 파일 전송 서비스입니다. FTP 서버 간 파일을 자동으로 전송합니다.
+
+## 개요
+
+```mermaid
+flowchart LR
+    subgraph Kafka
+        T[file-transfer-jobs]
+        DLQ[file-transfer-dlq]
+    end
+
+    subgraph ETL Container
+        C[Consumer]
+        K[Kafka Broker]
+    end
+
+    subgraph External
+        SRC[(Source FTP)]
+        DST[(Dest FTP)]
+    end
+
+    T --> C
+    C --> SRC
+    SRC --> C
+    C --> DST
+    C -.실패.-> DLQ
+```
+
+## 주요 기능
+
+- **Kafka 기반 작업 큐**: 메시지 큐에서 파일 전송 작업을 읽어 처리
+- **FTP 파일 전송**: Source FTP에서 Destination FTP로 파일 전송
+- **DLQ 지원**: 실패한 작업은 Dead Letter Queue로 이동
+- **단일 컨테이너 배포**: Kafka 브로커 + ETL Consumer를 하나의 컨테이너로 실행
+- **확장 가능한 구조**: S3 등 다른 전송 프로토콜 추가 가능
+
+## 기술 스택
+
+| 구분 | 기술 |
+|------|-----|
+| Base Image | Rocky Linux 8 |
+| Runtime | Python 3.12 |
+| Message Queue | Apache Kafka 4.1.1 (KRaft 모드) |
+| Kafka Client | kafka-python |
+
+## 프로젝트 구조
+
+```
+etl-file-sync/
+├── docker/
+│   ├── Dockerfile           # 컨테이너 빌드 정의
+│   ├── entrypoint.sh        # 컨테이너 시작 스크립트
+│   └── supervisord.conf     # 프로세스 관리 설정
+├── kafka/
+│   └── config/
+│       └── server.properties  # KRaft 단일 노드 설정
+├── src/
+│   └── etl/
+│       ├── __init__.py
+│       ├── main.py           # CLI 진입점
+│       ├── consumer.py       # Kafka Consumer
+│       ├── config.py         # 환경 설정 로더
+│       ├── models/
+│       │   └── message.py    # 메시지 스키마
+│       └── transfer/
+│           ├── base.py       # 추상 전송 클래스
+│           └── ftp.py        # FTP 구현체
+├── tests/                    # 테스트 코드
+├── .env.example              # 환경변수 예시
+├── requirements.txt          # 프로덕션 의존성
+└── requirements-dev.txt      # 개발 의존성
+```
+
+## 설치 및 실행
+
+### Docker 빌드
+
+```bash
+docker build -t etl-file-sync -f docker/Dockerfile .
+```
+
+### 실행
+
+```bash
+# 기본 실행
+docker run --env-file .env etl-file-sync
+
+# 토픽 및 옵션 지정
+docker run --env-file .env etl-file-sync \
+    --topic file-transfer-jobs \
+    --group-id etl-worker-1 \
+    --bootstrap-servers localhost:9092
+```
+
+### CLI 옵션
+
+| 옵션 | 설명 | 기본값 |
+|------|-----|--------|
+| `--topic` | 구독할 Kafka 토픽 | `file-transfer-jobs` |
+| `--group-id` | Consumer 그룹 ID | `etl-worker-group` |
+| `--bootstrap-servers` | Kafka 브로커 주소 | `localhost:9092` |
+| `--env-file` | .env 파일 경로 | - |
+| `-v, --verbose` | 디버그 로그 활성화 | `false` |
+
+## 환경 설정
+
+`.env.example`을 복사하여 `.env` 파일을 생성하세요.
+
+```bash
+cp .env.example .env
+```
+
+### 환경변수
+
+```bash
+# FTP 전역 설정
+FTP_PASSIVE_MODE=true              # Passive 모드 (기본값: true)
+
+# DLQ 설정
+DLQ_TOPIC=file-transfer-dlq        # 실패 메시지 토픽
+
+# 서버 정의 형식: {HOSTNAME}_{PROPERTY}
+SRC_FTP_SERVER1_TYPE=ftp
+SRC_FTP_SERVER1_HOST=ftp.source.com
+SRC_FTP_SERVER1_PORT=21
+SRC_FTP_SERVER1_USER=username
+SRC_FTP_SERVER1_PASS=password
+
+DST_FTP_SERVER1_TYPE=ftp
+DST_FTP_SERVER1_HOST=ftp.dest.com
+DST_FTP_SERVER1_PORT=21
+DST_FTP_SERVER1_USER=username
+DST_FTP_SERVER1_PASS=password
+```
+
+## 메시지 스키마
+
+### 파일 전송 작업 메시지
+
+```json
+{
+    "job_id": "550e8400-e29b-41d4-a716-446655440000",
+    "source": {
+        "hostname": "SRC_FTP_SERVER1",
+        "path": "/data/input/file.csv"
+    },
+    "destination": {
+        "hostname": "DST_FTP_SERVER1",
+        "path": "/data/output/file.csv"
+    }
+}
+```
+
+| 필드 | 설명 | 필수 |
+|------|-----|------|
+| `job_id` | 작업 고유 ID (UUID) | 선택 (자동생성) |
+| `source.hostname` | .env에 정의된 서버 hostname | 필수 |
+| `source.path` | 원본 파일 경로 | 필수 |
+| `destination.hostname` | .env에 정의된 서버 hostname | 필수 |
+| `destination.path` | 대상 파일 경로 | 필수 |
+
+### DLQ 메시지
+
+실패한 작업은 DLQ 토픽으로 전송됩니다.
+
+```json
+{
+    "original_message": { ... },
+    "error": "ConnectionRefused: ftp.source.com:21",
+    "timestamp": "2025-12-08T10:30:00Z",
+    "retry_count": 0
+}
+```
+
+## 테스트
+
+### 테스트 환경 설정
+
+```bash
+# 가상환경 생성
+python -m venv .venv
+source .venv/bin/activate
+
+# 의존성 설치
+pip install -r requirements.txt
+pip install -r requirements-dev.txt
+```
+
+### 테스트 FTP 서버 실행
+
+```bash
+docker-compose -f docker-compose.test.yml up -d
+```
+
+### 테스트 실행
+
+```bash
+# 전체 테스트
+pytest tests/ -v
+
+# 단위 테스트만
+pytest tests/test_config.py tests/test_message.py -v
+
+# 통합 테스트만
+pytest tests/test_ftp_integration.py -v
+```
+
+### 테스트 환경 정리
+
+```bash
+docker-compose -f docker-compose.test.yml down -v
+```
+
+## 아키텍처
+
+### 컴포넌트 다이어그램
+
+```mermaid
+classDiagram
+    class FileTransferConsumer {
+        +topic: str
+        +group_id: str
+        +start()
+        +stop()
+        -_process_message()
+        -_execute_transfer()
+        -_send_to_dlq()
+    }
+
+    class ConfigLoader {
+        +ftp_passive_mode: bool
+        +dlq_topic: str
+        +get_server_config(hostname)
+    }
+
+    class BaseTransfer {
+        <<abstract>>
+        +connect()
+        +disconnect()
+        +download()
+        +upload()
+    }
+
+    class FTPTransfer {
+        +passive_mode: bool
+        +connect()
+        +disconnect()
+        +download()
+        +upload()
+    }
+
+    class TransferFactory {
+        +register(type, handler)
+        +create(config)
+    }
+
+    FileTransferConsumer --> ConfigLoader
+    FileTransferConsumer --> TransferFactory
+    TransferFactory --> BaseTransfer
+    FTPTransfer --|> BaseTransfer
+```
+
+### 처리 흐름
+
+```mermaid
+sequenceDiagram
+    participant K as Kafka
+    participant C as Consumer
+    participant CF as ConfigLoader
+    participant T as TransferFactory
+    participant SRC as Source FTP
+    participant DST as Dest FTP
+    participant DLQ as DLQ Topic
+
+    K->>C: 메시지 수신
+    C->>CF: 서버 설정 조회
+    CF-->>C: ServerConfig
+
+    C->>T: Transfer 생성
+    T-->>C: FTPTransfer
+
+    C->>SRC: download()
+    SRC-->>C: 파일 데이터
+
+    C->>DST: upload()
+    DST-->>C: 완료
+
+    C->>K: offset commit
+
+    alt 실패 시
+        C->>DLQ: 에러 메시지 전송
+        C->>K: offset commit
+    end
+```
+
+## 확장 계획
+
+- [ ] S3 Transfer 지원
+- [ ] SFTP Transfer 지원
+- [ ] 재시도 로직 (exponential backoff)
+- [ ] 메트릭 수집 (Prometheus)
+- [ ] 파일 무결성 검증 (checksum)
+
+## 라이선스
+
+MIT License
