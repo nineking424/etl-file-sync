@@ -1,0 +1,7 @@
+# ETL File Sync Dependencies
+
+# Kafka client
+kafka-python>=2.0.2
+
+# Environment variable management
+python-dotenv>=1.0.0
