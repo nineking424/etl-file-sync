@@ -2,15 +2,19 @@
 
 import argparse
 import logging
+import os
 import signal
 import sys
 
 from .consumer import FileTransferConsumer
 
-# Configure logging
+# Get worker ID from environment (set by supervisor for each process)
+WORKER_ID = os.getenv("ETL_WORKER_ID", "worker-00")
+
+# Configure logging with worker ID
 logging.basicConfig(
     level=logging.INFO,
-    format="%(asctime)s - %(name)s - %(levelname)s - %(message)s",
+    format=f"%(asctime)s - [{WORKER_ID}] - %(name)s - %(levelname)s - %(message)s",
     handlers=[logging.StreamHandler(sys.stdout)],
 )
 
@@ -111,6 +115,7 @@ def main() -> None:
     logger.info("=" * 50)
     logger.info("ETL File Sync Consumer Starting")
     logger.info("=" * 50)
+    logger.info(f"Worker ID: {WORKER_ID}")
     logger.info(f"Topic: {topic}")
     logger.info(f"Group ID: {group_id}")
     logger.info(f"Bootstrap Servers: {bootstrap_servers}")
