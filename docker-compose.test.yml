@@ -57,7 +57,7 @@ services:
       - DST_FTP_SERVER1_PORT=21
       - DST_FTP_SERVER1_USER=dstuser
       - DST_FTP_SERVER1_PASS=dstpass
-    command: --topic test-transfer --group-id test-group
+    command: ["test-transfer", "test-group", "localhost:9092"]
     networks:
       - etl-test-net
     depends_on:

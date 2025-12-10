@@ -15,6 +15,7 @@ ENV PATH="${KAFKA_HOME}/bin:${JAVA_HOME}/bin:${PATH}"
 
 # Install system dependencies
 RUN dnf -y update && \
+    dnf -y install epel-release && \
     dnf -y install \
         java-21-openjdk \
         java-21-openjdk-devel \
