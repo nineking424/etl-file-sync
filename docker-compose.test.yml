@@ -37,6 +37,38 @@ services:
     networks:
       - etl-test-net
 
+  # ETL File Sync (Kafka + Consumer)
+  etl-file-sync:
+    image: etl-file-sync:latest
+    container_name: etl-test
+    ports:
+      - "9092:9092"
+    environment:
+      # FTP settings (use Docker network hostnames)
+      - FTP_PASSIVE_MODE=true
+      - DLQ_TOPIC_SUFFIX=-dlq
+      - SRC_FTP_SERVER1_TYPE=ftp
+      - SRC_FTP_SERVER1_HOST=ftp-source
+      - SRC_FTP_SERVER1_PORT=21
+      - SRC_FTP_SERVER1_USER=srcuser
+      - SRC_FTP_SERVER1_PASS=srcpass
+      - DST_FTP_SERVER1_TYPE=ftp
+      - DST_FTP_SERVER1_HOST=ftp-dest
+      - DST_FTP_SERVER1_PORT=21
+      - DST_FTP_SERVER1_USER=dstuser
+      - DST_FTP_SERVER1_PASS=dstpass
+    command: --topic test-transfer --group-id test-group
+    networks:
+      - etl-test-net
+    depends_on:
+      - ftp-source
+      - ftp-dest
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
 volumes:
   ftp-source-data:
   ftp-dest-data:
