@@ -268,6 +268,16 @@ DST_FTP_SERVER1_PASS=password
 
 ## 테스트
 
+### 테스트 분류
+
+| 마커 | 설명 | 인프라 필요 |
+|------|-----|-----------|
+| `@pytest.mark.unit` | 단위 테스트 (Mock 기반) | X |
+| `@pytest.mark.integration` | FTP 통합 테스트 | O (FTP) |
+| `@pytest.mark.e2e` | E2E 테스트 | O (FTP + Kafka) |
+
+> **중요**: 통합/E2E 테스트는 인프라가 없으면 **FAIL** 합니다 (skip 아님).
+
 ### 테스트 환경 설정
 
 ```bash
@@ -280,23 +290,67 @@ pip install -r requirements.txt
 pip install -r requirements-dev.txt
 ```
 
-### 테스트 FTP 서버 실행
-
-```bash
-docker-compose -f docker-compose.test.yml up -d
-```
-
 ### 테스트 실행
 
+#### 단위 테스트만 (인프라 불필요)
+
 ```bash
-# 전체 테스트
-pytest tests/ -v
+pytest -m unit -v
+```
 
-# 단위 테스트만
-pytest tests/test_config.py tests/test_message.py -v
+#### 전체 테스트 (인프라 필요)
 
-# 통합 테스트만
-pytest tests/test_ftp_integration.py -v
+```bash
+# 1. Docker 이미지 빌드 (최초 1회)
+docker build -t etl-file-sync -f docker/Dockerfile .
+
+# 2. 테스트 인프라 시작
+docker-compose -f docker-compose.test.yml up -d
+
+# 3. Kafka 토픽 생성 (최초 1회)
+docker exec etl-test /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server localhost:9092 \
+    --create --topic test-transfer --partitions 1 --replication-factor 1
+
+docker exec etl-test /opt/kafka/bin/kafka-topics.sh \
+    --bootstrap-server localhost:9092 \
+    --create --topic test-transfer-dlq --partitions 1 --replication-factor 1
+
+# 4. Consumer 재시작 (토픽 생성 후)
+docker exec etl-test supervisorctl restart etl-consumer
+
+# 5. 전체 테스트 실행
+pytest -v --cov=src/etl --cov-report=term-missing
+```
+
+#### 특정 테스트만
+
+```bash
+# FTP 통합 테스트만
+pytest -m integration -v
+
+# E2E 테스트만
+pytest -m e2e -v
+
+# 헬스체크 테스트 (인프라 상태 확인)
+pytest tests/test_health.py -v
+```
+
+### 테스트 커버리지
+
+현재 커버리지: **88%**
+
+```
+Name                           Stmts   Miss  Cover
+--------------------------------------------------
+src/etl/config.py                 42      6    86%
+src/etl/consumer.py               99     16    84%
+src/etl/main.py                   55      1    98%
+src/etl/models/message.py         44      0   100%
+src/etl/transfer/base.py          34      4    88%
+src/etl/transfer/ftp.py           81     16    80%
+--------------------------------------------------
+TOTAL                            361     43    88%
 ```
 
 ### 테스트 환경 정리
