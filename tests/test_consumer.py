@@ -10,6 +10,9 @@ from etl.config import ConfigLoader, ServerConfig
 from etl.models import FileTransferJob, DLQMessage
 from etl.transfer.ftp import FTPTransfer
 
+# Mark all tests as unit tests (no infrastructure required)
+pytestmark = pytest.mark.unit
+
 
 @pytest.fixture
 def mock_config():

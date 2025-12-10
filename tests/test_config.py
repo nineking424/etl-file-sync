@@ -5,6 +5,9 @@ import pytest
 
 from etl.config import ConfigLoader, get_config, ServerConfig
 
+# Mark all tests as unit tests (no infrastructure required)
+pytestmark = pytest.mark.unit
+
 
 class TestConfigLoader:
     """Test ConfigLoader class."""

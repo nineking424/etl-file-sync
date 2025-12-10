@@ -39,14 +39,27 @@ def is_kafka_available():
         return False
 
 
-# Skip all tests if full stack not available
-pytestmark = pytest.mark.skipif(
-    not (is_kafka_available() and is_ftp_available()),
-    reason="Full test stack not running. Run: docker-compose -f docker-compose.test.yml up -d"
-)
+# Mark all tests as E2E tests
+pytestmark = pytest.mark.e2e
 
 
-@pytest.mark.e2e
+@pytest.fixture(autouse=True)
+def require_full_infrastructure():
+    """Ensure full infrastructure is available. FAIL if not."""
+    missing = []
+    if not is_ftp_available():
+        missing.append("FTP (localhost:2121)")
+    if not is_kafka_available():
+        missing.append("Kafka (localhost:9092)")
+
+    if missing:
+        pytest.fail(
+            f"Infrastructure required but not available: {', '.join(missing)}. "
+            "Run: docker-compose -f docker-compose.test.yml up -d"
+        )
+
+
+
 class TestEndToEndTransfer:
     """Full pipeline tests: Kafka -> Container Consumer -> FTP."""
 
@@ -108,7 +121,6 @@ class TestEndToEndTransfer:
             os.unlink(local_path)
 
 
-@pytest.mark.e2e
 class TestDLQPipeline:
     """Test DLQ handling end-to-end."""
 

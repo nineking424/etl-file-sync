@@ -15,7 +15,7 @@ from etl.config import ConfigLoader
 from etl.transfer.ftp import FTPTransfer
 
 
-# Skip if FTP servers not available
+# Check if FTP servers are available
 def is_ftp_available():
     """Check if test FTP servers are running."""
     import socket
@@ -28,10 +28,18 @@ def is_ftp_available():
         return False
 
 
-pytestmark = pytest.mark.skipif(
-    not is_ftp_available(),
-    reason="FTP test servers not running. Run: docker-compose -f docker-compose.test.yml up -d"
-)
+# Mark all tests as integration tests
+pytestmark = pytest.mark.integration
+
+
+@pytest.fixture(autouse=True)
+def require_ftp_infrastructure():
+    """Ensure FTP infrastructure is available. FAIL if not."""
+    if not is_ftp_available():
+        pytest.fail(
+            "FTP infrastructure required but not available. "
+            "Run: docker-compose -f docker-compose.test.yml up -d"
+        )
 
 
 @pytest.fixture

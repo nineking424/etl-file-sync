@@ -5,6 +5,9 @@ import pytest
 
 from etl.models import FileTransferJob, Endpoint, DLQMessage
 
+# Mark all tests as unit tests (no infrastructure required)
+pytestmark = pytest.mark.unit
+
 
 class TestEndpoint:
     """Test Endpoint model."""

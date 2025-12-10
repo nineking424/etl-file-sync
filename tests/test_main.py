@@ -8,6 +8,9 @@ from unittest.mock import Mock, patch, MagicMock
 from etl import main as main_module
 from etl.main import parse_args, signal_handler, main
 
+# Mark all tests as unit tests (no infrastructure required)
+pytestmark = pytest.mark.unit
+
 
 class TestArgumentParsing:
     """Test CLI argument parsing."""

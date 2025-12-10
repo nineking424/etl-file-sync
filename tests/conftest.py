@@ -79,9 +79,12 @@ def kafka_bootstrap_servers():
 
 @pytest.fixture
 def kafka_producer(kafka_bootstrap_servers):
-    """Create Kafka producer for test messages."""
+    """Create Kafka producer for test messages. FAIL if Kafka unavailable."""
     if not is_kafka_available():
-        pytest.skip("Kafka not available")
+        pytest.fail(
+            "Kafka required but not available (localhost:9092). "
+            "Run: docker-compose -f docker-compose.test.yml up -d"
+        )
 
     from kafka import KafkaProducer
 

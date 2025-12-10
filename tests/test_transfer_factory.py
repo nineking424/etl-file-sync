@@ -6,6 +6,9 @@ from unittest.mock import Mock, MagicMock
 from etl.transfer.base import BaseTransfer, TransferFactory
 from etl.config import ServerConfig
 
+# Mark all tests as unit tests (no infrastructure required)
+pytestmark = pytest.mark.unit
+
 
 class MockTransfer(BaseTransfer):
     """Mock transfer handler for testing."""
