@@ -34,17 +34,23 @@ class ConfigLoader:
             load_dotenv()
 
         self._ftp_passive_mode = self._get_bool("FTP_PASSIVE_MODE", True)
-        self._dlq_topic = os.getenv("DLQ_TOPIC", "file-transfer-dlq")
+        self._dlq_topic_suffix = os.getenv("DLQ_TOPIC_SUFFIX", "-dlq")
 
     @property
     def ftp_passive_mode(self) -> bool:
         """Get FTP passive mode setting."""
         return self._ftp_passive_mode
 
-    @property
-    def dlq_topic(self) -> str:
-        """Get DLQ topic name."""
-        return self._dlq_topic
+    def get_dlq_topic(self, source_topic: str) -> str:
+        """Get DLQ topic name for a given source topic.
+
+        Args:
+            source_topic: Source topic name (e.g., "mem-dft-img")
+
+        Returns:
+            DLQ topic name (e.g., "mem-dft-img-dlq")
+        """
+        return f"{source_topic}{self._dlq_topic_suffix}"
 
     def _get_bool(self, key: str, default: bool = False) -> bool:
         """Get boolean value from environment variable."""

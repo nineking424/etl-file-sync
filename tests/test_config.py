@@ -19,10 +19,44 @@ class TestConfigLoader:
         config = ConfigLoader(test_env_file)
         assert config.ftp_passive_mode is True
 
-    def test_dlq_topic(self, test_env_file):
-        """Test DLQ topic setting."""
+    def test_get_dlq_topic_default_suffix(self, test_env_file):
+        """Test DLQ topic generation with default suffix."""
         config = ConfigLoader(test_env_file)
-        assert config.dlq_topic == "file-transfer-dlq"
+        assert config.get_dlq_topic("mem-dft-img") == "mem-dft-img-dlq"
+        assert config.get_dlq_topic("fdry-cdsem-img") == "fdry-cdsem-img-dlq"
+
+    def test_get_dlq_topic_custom_suffix(self, monkeypatch):
+        """Test DLQ topic generation with custom suffix."""
+        monkeypatch.setenv("DLQ_TOPIC_SUFFIX", ".failed")
+        config = ConfigLoader()
+        assert config.get_dlq_topic("test-topic") == "test-topic.failed"
+
+    def test_get_dlq_topic_empty_suffix(self, monkeypatch):
+        """Test DLQ topic generation with empty suffix."""
+        monkeypatch.setenv("DLQ_TOPIC_SUFFIX", "")
+        config = ConfigLoader()
+        assert config.get_dlq_topic("test-topic") == "test-topic"
+
+    # Boundary value tests for get_dlq_topic
+    def test_get_dlq_topic_with_special_characters(self, test_env_file):
+        """Test DLQ topic with special characters in topic name."""
+        config = ConfigLoader(test_env_file)
+        assert config.get_dlq_topic("topic-with-dashes") == "topic-with-dashes-dlq"
+        assert config.get_dlq_topic("topic.with.dots") == "topic.with.dots-dlq"
+        assert config.get_dlq_topic("topic_with_underscores") == "topic_with_underscores-dlq"
+
+    def test_get_dlq_topic_with_long_name(self, test_env_file):
+        """Test DLQ topic with very long topic name."""
+        config = ConfigLoader(test_env_file)
+        long_topic = "a" * 200
+        result = config.get_dlq_topic(long_topic)
+        assert result == f"{long_topic}-dlq"
+        assert len(result) == 204
+
+    def test_get_dlq_topic_with_single_char(self, test_env_file):
+        """Test DLQ topic with single character topic name."""
+        config = ConfigLoader(test_env_file)
+        assert config.get_dlq_topic("x") == "x-dlq"
 
     def test_get_server_config_source(self, test_env_file):
         """Test getting source server config."""

@@ -1,0 +1,206 @@
+version: '3.8'
+
+# ETL File Sync 병렬 처리 설정
+# 각 서비스는 동일한 Consumer Group을 사용하여 Kafka 파티션을 자동 분배받습니다.
+#
+# 사용법:
+#   docker-compose -f docker-compose.parallel.yml up -d
+#
+# 프로세스 수 조정:
+#   토픽별 프로세스 수는 해당 토픽의 파티션 수 이하로 설정하세요.
+#   (초과 시 일부 프로세스는 유휴 상태가 됩니다)
+
+services:
+  # ============================================
+  # mem-dft-img 토픽 컨슈머 (3개 인스턴스)
+  # ============================================
+  etl-mem-dft-1:
+    image: etl-file-sync:latest
+    container_name: etl-mem-dft-1
+    env_file: .env
+    command: --topic mem-dft-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  etl-mem-dft-2:
+    image: etl-file-sync:latest
+    container_name: etl-mem-dft-2
+    env_file: .env
+    command: --topic mem-dft-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  etl-mem-dft-3:
+    image: etl-file-sync:latest
+    container_name: etl-mem-dft-3
+    env_file: .env
+    command: --topic mem-dft-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # fdry-dft-img 토픽 컨슈머 (2개 인스턴스)
+  # ============================================
+  etl-fdry-dft-1:
+    image: etl-file-sync:latest
+    container_name: etl-fdry-dft-1
+    env_file: .env
+    command: --topic fdry-dft-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  etl-fdry-dft-2:
+    image: etl-file-sync:latest
+    container_name: etl-fdry-dft-2
+    env_file: .env
+    command: --topic fdry-dft-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # mem-cdsem-img 토픽 컨슈머 (2개 인스턴스)
+  # ============================================
+  etl-mem-cdsem-1:
+    image: etl-file-sync:latest
+    container_name: etl-mem-cdsem-1
+    env_file: .env
+    command: --topic mem-cdsem-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  etl-mem-cdsem-2:
+    image: etl-file-sync:latest
+    container_name: etl-mem-cdsem-2
+    env_file: .env
+    command: --topic mem-cdsem-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # fdry-cdsem-img 토픽 컨슈머 (2개 인스턴스)
+  # ============================================
+  etl-fdry-cdsem-1:
+    image: etl-file-sync:latest
+    container_name: etl-fdry-cdsem-1
+    env_file: .env
+    command: --topic fdry-cdsem-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  etl-fdry-cdsem-2:
+    image: etl-file-sync:latest
+    container_name: etl-fdry-cdsem-2
+    env_file: .env
+    command: --topic fdry-cdsem-img --group-id etl-worker-group --bootstrap-servers kafka:9092
+    restart: unless-stopped
+    networks:
+      - etl-network
+    depends_on:
+      - kafka
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+  # ============================================
+  # Kafka 브로커 (공유)
+  # ============================================
+  kafka:
+    image: apache/kafka:latest
+    container_name: etl-kafka
+    ports:
+      - "9092:9092"
+    environment:
+      KAFKA_NODE_ID: 1
+      KAFKA_PROCESS_ROLES: broker,controller
+      KAFKA_LISTENERS: PLAINTEXT://0.0.0.0:9092,CONTROLLER://0.0.0.0:9093
+      KAFKA_ADVERTISED_LISTENERS: PLAINTEXT://kafka:9092
+      KAFKA_CONTROLLER_LISTENER_NAMES: CONTROLLER
+      KAFKA_LISTENER_SECURITY_PROTOCOL_MAP: CONTROLLER:PLAINTEXT,PLAINTEXT:PLAINTEXT
+      KAFKA_CONTROLLER_QUORUM_VOTERS: 1@kafka:9093
+      KAFKA_OFFSETS_TOPIC_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_REPLICATION_FACTOR: 1
+      KAFKA_TRANSACTION_STATE_LOG_MIN_ISR: 1
+      KAFKA_LOG_DIRS: /var/lib/kafka/data
+    volumes:
+      - kafka-data:/var/lib/kafka/data
+    networks:
+      - etl-network
+    logging:
+      driver: "json-file"
+      options:
+        max-size: "10m"
+        max-file: "3"
+
+volumes:
+  kafka-data:
+    driver: local
+
+networks:
+  etl-network:
+    driver: bridge

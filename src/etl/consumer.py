@@ -211,7 +211,7 @@ class FileTransferConsumer:
         Args:
             message: JSON message to send
         """
-        dlq_topic = self.config.dlq_topic
+        dlq_topic = self.config.get_dlq_topic(self.topic)
         logger.warning(f"Sending message to DLQ: {dlq_topic}")
 
         try:

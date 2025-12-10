@@ -6,14 +6,19 @@ Kafka 메시지 큐 기반 파일 전송 서비스입니다. FTP 서버 간 파�
 
 ```mermaid
 flowchart LR
-    subgraph Kafka
-        T[file-transfer-jobs]
-        DLQ[file-transfer-dlq]
+    subgraph Kafka Topics
+        T1[mem-dft-img]
+        T2[fdry-dft-img]
+        T3[mem-cdsem-img]
+        T4[fdry-cdsem-img]
+        DLQ1[mem-dft-img-dlq]
+        DLQ2[fdry-dft-img-dlq]
     end
 
-    subgraph ETL Container
-        C[Consumer]
-        K[Kafka Broker]
+    subgraph Consumer Group
+        C1[Consumer 1]
+        C2[Consumer 2]
+        C3[Consumer 3]
     end
 
     subgraph External
@@ -21,12 +26,17 @@ flowchart LR
         DST[(Dest FTP)]
     end
 
-    T --> C
-    C --> SRC
-    SRC --> C
-    C --> DST
-    C -.실패.-> DLQ
+    T1 --> C1
+    T1 --> C2
+    T1 --> C3
+    C1 --> SRC
+    C2 --> SRC
+    C3 --> SRC
+    SRC --> DST
+    C1 -.실패.-> DLQ1
 ```
+
+> **병렬 처리**: 동일 토픽에 여러 Consumer를 실행하면 Kafka가 파티션을 자동 분배하여 병렬 처리합니다.
 
 ## 주요 기능
 
@@ -104,6 +114,76 @@ docker run --env-file .env etl-file-sync \
 | `--env-file` | .env 파일 경로 | - |
 | `-v, --verbose` | 디버그 로그 활성화 | `false` |
 
+## 병렬 처리 실행
+
+### 동일 토픽에 여러 프로세스 실행
+
+Kafka의 Consumer Group 메커니즘을 활용하여 동일 토픽을 여러 프로세스가 병렬로 처리할 수 있습니다.
+
+```bash
+# mem-dft-img 토픽에 3개 프로세스 (Kafka 파티션 수에 맞춤)
+docker run -d --name etl-mem-dft-1 --env-file .env etl-file-sync \
+    --topic mem-dft-img --group-id etl-worker-group
+
+docker run -d --name etl-mem-dft-2 --env-file .env etl-file-sync \
+    --topic mem-dft-img --group-id etl-worker-group
+
+docker run -d --name etl-mem-dft-3 --env-file .env etl-file-sync \
+    --topic mem-dft-img --group-id etl-worker-group
+```
+
+> **중요**:
+> - 동일한 `--group-id`를 사용하면 Kafka가 자동으로 파티션을 분배합니다.
+> - 프로세스 수는 토픽의 파티션 수 이하로 설정하세요 (초과 시 일부 프로세스는 유휴 상태).
+
+### Docker Compose로 관리 (권장)
+
+`docker-compose.parallel.yml`을 사용하여 여러 프로세스를 한 번에 관리할 수 있습니다.
+
+```bash
+# 전체 프로세스 시작
+docker-compose -f docker-compose.parallel.yml up -d
+
+# 로그 확인
+docker-compose -f docker-compose.parallel.yml logs -f etl-mem-dft-1
+
+# 전체 중지
+docker-compose -f docker-compose.parallel.yml down
+```
+
+### Consumer Group 모니터링
+
+```bash
+# Consumer Group 상태 확인
+kafka-consumer-groups.sh --describe \
+    --group etl-worker-group \
+    --bootstrap-server localhost:9092
+```
+
+출력 예시:
+```
+TOPIC           PARTITION  CURRENT-OFFSET  LOG-END-OFFSET  LAG  CONSUMER-ID
+mem-dft-img     0          100             100             0    consumer-1
+mem-dft-img     1          98              100             2    consumer-2
+mem-dft-img     2          102             102             0    consumer-3
+```
+
+### Kafka 토픽 생성
+
+```bash
+# 파티션 수 = 최대 동시 실행할 프로세스 수
+kafka-topics.sh --create \
+    --topic mem-dft-img \
+    --partitions 3 \
+    --bootstrap-server localhost:9092
+
+# DLQ 토픽 (파티션 1개로 충분)
+kafka-topics.sh --create \
+    --topic mem-dft-img-dlq \
+    --partitions 1 \
+    --bootstrap-server localhost:9092
+```
+
 ## 환경 설정
 
 `.env.example`을 복사하여 `.env` 파일을 생성하세요.
@@ -119,7 +199,8 @@ cp .env.example .env
 FTP_PASSIVE_MODE=true              # Passive 모드 (기본값: true)
 
 # DLQ 설정
-DLQ_TOPIC=file-transfer-dlq        # 실패 메시지 토픽
+DLQ_TOPIC_SUFFIX=-dlq              # DLQ 토픽 suffix (토픽별 자동 생성)
+                                   # 예: mem-dft-img -> mem-dft-img-dlq
 
 # 서버 정의 형식: {HOSTNAME}_{PROPERTY}
 SRC_FTP_SERVER1_TYPE=ftp
@@ -134,6 +215,17 @@ DST_FTP_SERVER1_PORT=21
 DST_FTP_SERVER1_USER=username
 DST_FTP_SERVER1_PASS=password
 ```
+
+### DLQ 토픽 매핑
+
+실패한 메시지는 소스 토픽에 suffix를 붙여 자동 생성된 DLQ 토픽으로 전송됩니다.
+
+| 소스 토픽 | DLQ 토픽 |
+|----------|---------|
+| mem-dft-img | mem-dft-img-dlq |
+| fdry-dft-img | fdry-dft-img-dlq |
+| mem-cdsem-img | mem-cdsem-img-dlq |
+| fdry-cdsem-img | fdry-cdsem-img-dlq |
 
 ## 메시지 스키마
 

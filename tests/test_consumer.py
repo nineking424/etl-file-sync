@@ -16,7 +16,7 @@ def mock_config():
     """Create mock ConfigLoader."""
     config = Mock(spec=ConfigLoader)
     config.ftp_passive_mode = True
-    config.dlq_topic = "test-dlq"
+    config.get_dlq_topic = Mock(side_effect=lambda topic: f"{topic}-dlq")
 
     # Setup server configs
     src_config = ServerConfig(
@@ -453,6 +453,61 @@ class TestTransferExecution:
 
                         # Verify temp file deletion was still attempted
                         mock_remove.assert_called()
+
+
+class TestTopicSpecificDLQ:
+    """Test topic-specific DLQ functionality."""
+
+    def test_dlq_topic_generated_from_source_topic(self, mock_config):
+        """Test DLQ topic is derived from source topic."""
+        consumer = FileTransferConsumer(
+            topic="mem-dft-img",
+            group_id="test-group",
+            config=mock_config,
+        )
+        consumer._producer = Mock()
+        consumer._producer.send.return_value.get.return_value = None
+
+        consumer._send_dlq_message('{"test": "message"}')
+
+        # Verify get_dlq_topic called with correct topic
+        mock_config.get_dlq_topic.assert_called_with("mem-dft-img")
+
+        # Verify message sent to correct DLQ
+        call_args = consumer._producer.send.call_args
+        assert call_args[0][0] == "mem-dft-img-dlq"
+
+    def test_different_consumers_use_different_dlqs(self, mock_config):
+        """Test different source topics use different DLQ topics."""
+        # Consumer 1 for mem-dft-img
+        consumer1 = FileTransferConsumer(
+            topic="mem-dft-img",
+            group_id="test-group",
+            config=mock_config,
+        )
+        consumer1._producer = Mock()
+        consumer1._producer.send.return_value.get.return_value = None
+
+        # Consumer 2 for fdry-cdsem-img
+        consumer2 = FileTransferConsumer(
+            topic="fdry-cdsem-img",
+            group_id="test-group",
+            config=mock_config,
+        )
+        consumer2._producer = Mock()
+        consumer2._producer.send.return_value.get.return_value = None
+
+        # Send messages to DLQ
+        consumer1._send_dlq_message('{"msg": "1"}')
+        consumer2._send_dlq_message('{"msg": "2"}')
+
+        # Verify different DLQ topics used
+        dlq1 = consumer1._producer.send.call_args[0][0]
+        dlq2 = consumer2._producer.send.call_args[0][0]
+
+        assert dlq1 == "mem-dft-img-dlq"
+        assert dlq2 == "fdry-cdsem-img-dlq"
+        assert dlq1 != dlq2
 
 
 class TestConsumerLifecycle:
