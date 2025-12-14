@@ -45,6 +45,7 @@ RUN wget -q "https://downloads.apache.org/kafka/${KAFKA_VERSION}/kafka_${SCALA_V
 # Create directories
 RUN mkdir -p /var/kafka-logs \
              /var/log/supervisor \
+             /etc/supervisord.d \
              /app
 
 # Copy Kafka configuration

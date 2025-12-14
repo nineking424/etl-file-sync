@@ -8,6 +8,9 @@ services:
     ports:
       - "9092:9092"
     environment:
+      # Multi-consumer configuration
+      - ETL_CONSUMER_COUNT=4
+      - ETL_NUM_PARTITIONS=4
       # FTP settings (use real FTP server)
       - FTP_PASSIVE_MODE=true
       - DLQ_TOPIC_SUFFIX=-dlq
