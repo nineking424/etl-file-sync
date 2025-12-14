@@ -14,10 +14,40 @@ import json
 import os
 import tempfile
 import time
+from typing import Callable
 
 import pytest
 
 from .conftest import is_ftp_available, is_kafka_available
+
+
+# E2E Test Configuration
+E2E_TIMEOUT = 3.0  # Maximum wait time for quick operations (DLQ, etc.)
+E2E_TRANSFER_TIMEOUT = 15.0  # Maximum wait time for file transfers (includes Kafka consumer lag + FTP latency)
+E2E_POLL_INTERVAL = 0.5  # Poll interval in seconds
+
+
+def wait_for_condition(
+    check_func: Callable[[], bool],
+    timeout: float = E2E_TIMEOUT,
+    interval: float = E2E_POLL_INTERVAL,
+) -> bool:
+    """Wait for a condition to be true with polling.
+
+    Args:
+        check_func: Function that returns True when condition is met
+        timeout: Maximum time to wait in seconds
+        interval: Time between checks in seconds
+
+    Returns:
+        True if condition was met, False if timeout
+    """
+    start = time.time()
+    while time.time() - start < timeout:
+        if check_func():
+            return True
+        time.sleep(interval)
+    return False
 
 
 # Mark all tests as E2E tests
@@ -88,20 +118,28 @@ class TestEndToEndTransfer:
             kafka_producer.send("test-transfer", value=json.dumps(job))
             kafka_producer.flush()
 
-            # 3. Wait for container consumer to process
-            time.sleep(5)
+            # 3. Wait for container consumer to process (polling)
+            downloaded_content = None
 
-            # 4. Verify file on destination FTP
-            with tempfile.TemporaryDirectory() as tmp_dir:
-                download_path = os.path.join(tmp_dir, "downloaded.txt")
+            def check_file_transferred():
+                nonlocal downloaded_content
+                try:
+                    with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                        tmp_download = tmp.name
+                    with FTPTransfer(dest_config, passive_mode=True) as dst:
+                        dst.download(dst_path, tmp_download)
+                    with open(tmp_download, "r") as f:
+                        downloaded_content = f.read()
+                    os.unlink(tmp_download)
+                    return True
+                except Exception:
+                    return False
 
-                with FTPTransfer(dest_config, passive_mode=True) as dst:
-                    dst.download(dst_path, download_path)
+            assert wait_for_condition(check_file_transferred, timeout=E2E_TRANSFER_TIMEOUT), \
+                f"File not transferred within {E2E_TRANSFER_TIMEOUT}s timeout"
 
-                with open(download_path, "r") as f:
-                    downloaded_content = f.read()
-
-                assert downloaded_content == test_content
+            # 4. Verify downloaded content
+            assert downloaded_content == test_content
 
         finally:
             os.unlink(local_path)
@@ -135,30 +173,33 @@ class TestDLQPipeline:
         kafka_producer.send("test-transfer", value=json.dumps(job))
         kafka_producer.flush()
 
-        # Wait for consumer to process and send to DLQ
-        time.sleep(5)
-
-        # Consume from DLQ to verify
+        # Poll DLQ for message with our job_id
         dlq_consumer = KafkaConsumer(
             "test-transfer-dlq",
             bootstrap_servers=[kafka_bootstrap_servers],
             auto_offset_reset="earliest",
-            consumer_timeout_ms=5000,
+            consumer_timeout_ms=500,  # Short timeout for polling
             value_deserializer=lambda m: m.decode("utf-8"),
         )
 
+        found_message = False
         dlq_messages = []
-        for msg in dlq_consumer:
-            dlq_messages.append(msg.value)
-            # Check if this is our message
-            if f"dlq-test-{timestamp}" in msg.value:
-                break
 
+        def check_dlq_message():
+            nonlocal found_message, dlq_messages
+            for msg in dlq_consumer:
+                dlq_messages.append(msg.value)
+                if f"dlq-test-{timestamp}" in msg.value:
+                    found_message = True
+                    return True
+            return False
+
+        wait_for_condition(check_dlq_message)
         dlq_consumer.close()
 
-        # Verify at least one DLQ message contains our job_id
-        assert any(f"dlq-test-{timestamp}" in m for m in dlq_messages), \
-            f"Expected job_id in DLQ messages. Got: {dlq_messages}"
+        # Verify our message was found in DLQ
+        assert found_message, \
+            f"Expected job_id dlq-test-{timestamp} in DLQ within {E2E_TIMEOUT}s. Got: {dlq_messages}"
 
     def test_invalid_json_goes_to_dlq(self, kafka_producer, kafka_bootstrap_servers):
         """
@@ -175,27 +216,30 @@ class TestDLQPipeline:
         kafka_producer.send("test-transfer", value=invalid_message)
         kafka_producer.flush()
 
-        # Wait for consumer to process
-        time.sleep(5)
-
-        # Consume from DLQ to verify
+        # Poll DLQ for our invalid message
         dlq_consumer = KafkaConsumer(
             "test-transfer-dlq",
             bootstrap_servers=[kafka_bootstrap_servers],
             auto_offset_reset="earliest",
-            consumer_timeout_ms=5000,
+            consumer_timeout_ms=500,  # Short timeout for polling
             value_deserializer=lambda m: m.decode("utf-8"),
         )
 
+        found_message = False
         dlq_messages = []
-        for msg in dlq_consumer:
-            dlq_messages.append(msg.value)
-            # Check if this is our message
-            if str(timestamp) in msg.value:
-                break
 
+        def check_dlq_message():
+            nonlocal found_message, dlq_messages
+            for msg in dlq_consumer:
+                dlq_messages.append(msg.value)
+                if str(timestamp) in msg.value:
+                    found_message = True
+                    return True
+            return False
+
+        wait_for_condition(check_dlq_message)
         dlq_consumer.close()
 
         # Verify our invalid message is in DLQ
-        assert any(str(timestamp) in m for m in dlq_messages), \
-            f"Expected timestamp {timestamp} in DLQ messages. Got: {dlq_messages}"
+        assert found_message, \
+            f"Expected timestamp {timestamp} in DLQ within {E2E_TIMEOUT}s. Got: {dlq_messages}"
