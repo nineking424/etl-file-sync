@@ -30,6 +30,20 @@ services:
         max-size: "10m"
         max-file: "3"
 
+  # Kafka UI for monitoring
+  kafka-ui:
+    image: provectuslabs/kafka-ui:latest
+    container_name: kafka-ui
+    ports:
+      - "8080:8080"
+    extra_hosts:
+      - "localhost:host-gateway"
+    environment:
+      - KAFKA_CLUSTERS_0_NAME=etl-test
+      - KAFKA_CLUSTERS_0_BOOTSTRAPSERVERS=localhost:9092
+    depends_on:
+      - etl-file-sync
+
 networks:
   etl-test-net:
     driver: bridge
