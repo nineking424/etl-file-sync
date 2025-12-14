@@ -40,6 +40,34 @@ def is_kafka_available():
         return False
 
 
+def ensure_kafka_topics_exist(bootstrap_servers: str, topics: list[str]):
+    """Ensure Kafka topics exist, create if not.
+
+    Args:
+        bootstrap_servers: Kafka bootstrap servers
+        topics: List of topic names to ensure exist
+    """
+    from kafka.admin import KafkaAdminClient, NewTopic
+
+    admin_client = KafkaAdminClient(
+        bootstrap_servers=bootstrap_servers,
+        client_id="test-admin"
+    )
+
+    try:
+        existing_topics = admin_client.list_topics()
+        topics_to_create = [t for t in topics if t not in existing_topics]
+
+        if topics_to_create:
+            new_topics = [
+                NewTopic(name=topic, num_partitions=1, replication_factor=1)
+                for topic in topics_to_create
+            ]
+            admin_client.create_topics(new_topics=new_topics, validate_only=False)
+    finally:
+        admin_client.close()
+
+
 @pytest.fixture
 def test_env_file():
     """Return path to test .env file."""
@@ -79,8 +107,21 @@ def kafka_bootstrap_servers():
     return "localhost:9092"
 
 
+@pytest.fixture(scope="session")
+def ensure_kafka_topics(kafka_bootstrap_servers):
+    """Ensure required Kafka topics exist for E2E tests.
+
+    Creates topics if they don't exist. Session-scoped to run once per test session.
+    """
+    if not is_kafka_available():
+        return  # Skip if Kafka unavailable (other fixtures will fail)
+
+    required_topics = ["test-transfer", "test-transfer-dlq"]
+    ensure_kafka_topics_exist(kafka_bootstrap_servers, required_topics)
+
+
 @pytest.fixture
-def kafka_producer(kafka_bootstrap_servers):
+def kafka_producer(kafka_bootstrap_servers, ensure_kafka_topics):
     """Create Kafka producer for test messages. FAIL if Kafka unavailable."""
     if not is_kafka_available():
         pytest.fail(
