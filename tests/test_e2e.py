@@ -61,8 +61,8 @@ class TestEndToEndTransfer:
 
         test_content = f"E2E test content - {time.time()}"
         timestamp = int(time.time())
-        src_path = f"e2e_test_{timestamp}.txt"
-        dst_path = f"e2e_received_{timestamp}.txt"
+        src_path = f"/testserver01/e2e_test_{timestamp}.txt"
+        dst_path = f"/testserver02/e2e_received_{timestamp}.txt"
 
         # 1. Create and upload test file to source FTP
         with tempfile.NamedTemporaryFile(mode="w", delete=False, suffix=".txt") as f:
@@ -125,11 +125,11 @@ class TestDLQPipeline:
             "job_id": f"dlq-test-{timestamp}",
             "source": {
                 "hostname": "SRC_FTP_SERVER1",
-                "path": f"/nonexistent_file_{timestamp}.txt"
+                "path": f"/testserver01/nonexistent_file_{timestamp}.txt"
             },
             "destination": {
                 "hostname": "DST_FTP_SERVER1",
-                "path": "/out.txt"
+                "path": "/testserver02/out.txt"
             }
         }
         kafka_producer.send("test-transfer", value=json.dumps(job))
