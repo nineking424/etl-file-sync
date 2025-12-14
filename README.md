@@ -42,6 +42,7 @@ flowchart LR
 
 - **Kafka 기반 작업 큐**: 메시지 큐에서 파일 전송 작업을 읽어 처리
 - **FTP 파일 전송**: Source FTP에서 Destination FTP로 파일 전송
+- **FTP 연결 풀링**: 스레드 안전한 연결 풀로 성능 최적화 (21.73 files/sec)
 - **DLQ 지원**: 실패한 작업은 Dead Letter Queue로 이동
 - **단일 컨테이너 배포**: Kafka 브로커 + ETL Consumer를 하나의 컨테이너로 실행
 - **Multi-Consumer 지원**: 컨테이너 내에서 여러 Consumer 인스턴스 동시 실행
@@ -80,7 +81,8 @@ etl-file-sync/
 │       └── transfer/
 │           ├── base.py       # 추상 전송 클래스
 │           ├── ftp.py        # FTP 구현체
-│           └── local.py      # Local 파일시스템 구현체
+│           ├── local.py      # Local 파일시스템 구현체
+│           └── pool.py       # FTP 연결 풀
 ├── scripts/
 │   └── run_tests.sh          # 우선순위 기반 테스트 실행 스크립트
 ├── tests/                    # 테스트 코드
@@ -461,6 +463,20 @@ src/etl/transfer/ftp.py           81     16    80%
 TOTAL                            361     43    88%
 ```
 
+### 성능 테스트 결과
+
+FTP 연결 풀링을 활용한 대량 파일 전송 성능 테스트 결과입니다.
+
+| 항목 | 결과 |
+|------|------|
+| 총 파일 수 | 1,000개 |
+| 성공 | 1,000개 (100%) |
+| 실패 | 0개 |
+| 소요 시간 | 46.03초 |
+| 처리량 | **21.73 files/sec** |
+
+> **테스트 환경**: FTP 연결 풀 (pool_size=4), E2E 테스트 인프라
+
 ### Kafka UI 모니터링
 
 테스트 환경에는 Kafka UI가 포함되어 있어 브라우저에서 토픽, 메시지, Consumer Group 상태를 확인할 수 있습니다.
@@ -520,6 +536,19 @@ classDiagram
         +upload()
     }
 
+    class FTPConnectionPool {
+        +pool_size: int
+        +timeout: int
+        +borrow() PooledConnection
+        +return_connection()
+        +close_all()
+    }
+
+    class FTPPoolManager {
+        +get_pool() FTPConnectionPool
+        +close_all()
+    }
+
     class LocalTransfer {
         +base_path: str
         +connect()
@@ -537,6 +566,8 @@ classDiagram
     FileTransferConsumer --> TransferFactory
     TransferFactory --> BaseTransfer
     FTPTransfer --|> BaseTransfer
+    FTPTransfer --> FTPPoolManager
+    FTPPoolManager --> FTPConnectionPool
     LocalTransfer --|> BaseTransfer
 ```
 
