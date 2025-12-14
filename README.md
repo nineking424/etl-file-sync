@@ -79,7 +79,10 @@ etl-file-sync/
 │       └── transfer/
 │           ├── base.py       # 추상 전송 클래스
 │           └── ftp.py        # FTP 구현체
+├── scripts/
+│   └── run_tests.sh          # 우선순위 기반 테스트 실행 스크립트
 ├── tests/                    # 테스트 코드
+├── Makefile                  # 개발 명령어 모음
 ├── .env.example              # 환경변수 예시
 ├── requirements.txt          # 프로덕션 의존성
 └── requirements-dev.txt      # 개발 의존성
@@ -291,6 +294,18 @@ DST_FTP_SERVER1_PASS=password
 
 ## 테스트
 
+### 우선순위 기반 테스트 전략
+
+이 프로젝트는 테스트 효율성을 극대화하기 위해 **우선순위 기반 테스트 실행 전략**을 사용합니다.
+
+**핵심 원칙:** E2E 테스트가 통과하면 시스템이 검증된 것입니다. 실패하면 하위 테스트가 원인을 진단합니다.
+
+| 우선순위 | 마커 | 목적 | 실행 규칙 |
+|---------|------|------|----------|
+| 1 (최고) | `e2e` | 전체 파이프라인 검증 | 항상 먼저 실행 |
+| 2 | `integration` | 컴포넌트 상호작용 | E2E 실패 시만 |
+| 3 (최저) | `unit` | 개별 단위 테스트 | 상위 실패 시만 |
+
 ### 테스트 분류
 
 | 마커 | 설명 | 인프라 필요 |
@@ -300,6 +315,16 @@ DST_FTP_SERVER1_PASS=password
 | `@pytest.mark.e2e` | E2E 테스트 | O (FTP + Kafka) |
 
 > **중요**: 통합/E2E 테스트는 인프라가 없으면 **FAIL** 합니다 (skip 아님).
+
+### 원인 진단 가이드
+
+테스트 실패 시 우선순위 시스템이 원인 파악을 도와줍니다:
+
+| 실패 패턴 | 진단 |
+|----------|------|
+| Unit 실패 | 코어 로직/모델 문제 |
+| Integration 실패, Unit 통과 | FTP 연결 또는 설정 문제 |
+| E2E 실패, 나머지 통과 | Kafka 연결, Consumer 로직 또는 파이프라인 통합 문제 |
 
 ### 테스트 환경 설정
 
@@ -314,6 +339,36 @@ pip install -r requirements-dev.txt
 ```
 
 ### 테스트 실행
+
+#### Makefile 사용 (권장)
+
+```bash
+# 우선순위 기반 실행 (E2E 통과 시 나머지 스킵)
+make test-priority
+
+# 상세 출력
+make test-priority-v
+
+# 커버리지 포함
+make test-priority-coverage
+
+# 모든 테스트 강제 실행
+make test-priority-all
+
+# 개별 테스트 레벨
+make test-e2e           # E2E 테스트만
+make test-integration   # 통합 테스트만
+make test-unit          # 단위 테스트만
+```
+
+#### 스크립트 직접 사용
+
+```bash
+./scripts/run_tests.sh           # 우선순위 기반 실행
+./scripts/run_tests.sh -v        # 상세 출력
+./scripts/run_tests.sh --coverage # 커버리지 포함
+./scripts/run_tests.sh --force-all # 모든 테스트 강제 실행
+```
 
 #### 단위 테스트만 (인프라 불필요)
 
