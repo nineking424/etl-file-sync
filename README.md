@@ -46,6 +46,7 @@ flowchart LR
 - **단일 컨테이너 배포**: Kafka 브로커 + ETL Consumer를 하나의 컨테이너로 실행
 - **Multi-Consumer 지원**: 컨테이너 내에서 여러 Consumer 인스턴스 동시 실행
 - **토픽 자동 생성**: 컨테이너 시작 시 Kafka 토픽 및 DLQ 토픽 자동 생성
+- **Local Transfer 지원**: 컨테이너 볼륨 마운트를 통한 로컬 파일 전송
 - **확장 가능한 구조**: S3 등 다른 전송 프로토콜 추가 가능
 
 ## 기술 스택
@@ -78,7 +79,8 @@ etl-file-sync/
 │       │   └── message.py    # 메시지 스키마
 │       └── transfer/
 │           ├── base.py       # 추상 전송 클래스
-│           └── ftp.py        # FTP 구현체
+│           ├── ftp.py        # FTP 구현체
+│           └── local.py      # Local 파일시스템 구현체
 ├── scripts/
 │   └── run_tests.sh          # 우선순위 기반 테스트 실행 스크립트
 ├── tests/                    # 테스트 코드
@@ -240,7 +242,18 @@ DST_FTP_SERVER1_HOST=ftp.dest.com
 DST_FTP_SERVER1_PORT=21
 DST_FTP_SERVER1_USER=username
 DST_FTP_SERVER1_PASS=password
+
+# Local Transfer 서버 (볼륨 마운트 기반)
+LOCAL_SERVER1_TYPE=local
+LOCAL_SERVER1_BASE_PATH=/shared      # 컨테이너 내 공유 디렉토리 경로
 ```
+
+### 지원 전송 유형
+
+| 타입 | 설명 | 용도 |
+|------|------|------|
+| `ftp` | FTP 프로토콜 전송 | 네트워크 기반 파일 전송 |
+| `local` | 로컬 파일시스템 복사 | 볼륨 마운트 기반 전송, 테스트 |
 
 ### DLQ 토픽 매핑
 
@@ -484,6 +497,14 @@ classDiagram
         +upload()
     }
 
+    class LocalTransfer {
+        +base_path: str
+        +connect()
+        +disconnect()
+        +download()
+        +upload()
+    }
+
     class TransferFactory {
         +register(type, handler)
         +create(config)
@@ -493,6 +514,7 @@ classDiagram
     FileTransferConsumer --> TransferFactory
     TransferFactory --> BaseTransfer
     FTPTransfer --|> BaseTransfer
+    LocalTransfer --|> BaseTransfer
 ```
 
 ### 처리 흐름
