@@ -116,8 +116,8 @@ class TestFTPUploadDownload:
             local_path = f.name
 
         try:
-            # Use relative path (user's home directory)
-            remote_path = f"upload_test_{time.time()}.txt"
+            # Use absolute path with permission directory
+            remote_path = f"/testserver01/upload_test_{time.time()}.txt"
 
             with FTPTransfer(source_config, passive_mode=True) as transfer:
                 transfer.upload(local_path, remote_path)
@@ -132,8 +132,8 @@ class TestFTPUploadDownload:
             f.write(test_content)
             upload_path = f.name
 
-        # Use relative path
-        remote_path = f"download_test_{time.time()}.txt"
+        # Use absolute path with permission directory
+        remote_path = f"/testserver01/download_test_{time.time()}.txt"
 
         try:
             # Upload
@@ -163,8 +163,8 @@ class TestFTPUploadDownload:
             local_path = f.name
 
         try:
-            # Use relative nested path
-            remote_path = f"nested/dir/structure/test_{time.time()}.txt"
+            # Use absolute nested path with permission directory
+            remote_path = f"/testserver01/nested/dir/structure/test_{time.time()}.txt"
 
             with FTPTransfer(source_config, passive_mode=True) as transfer:
                 transfer.upload(local_path, remote_path)
@@ -201,9 +201,9 @@ class TestFTPTransferFlow:
             original_path = f.name
 
         timestamp = int(time.time())
-        # Use relative paths
-        source_remote = f"transfer_test_{timestamp}.txt"
-        dest_remote = f"received_{timestamp}.txt"
+        # Use absolute paths with permission directories
+        source_remote = f"/testserver01/transfer_test_{timestamp}.txt"
+        dest_remote = f"/testserver02/received_{timestamp}.txt"
         temp_path = None
 
         try:
