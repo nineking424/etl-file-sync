@@ -448,19 +448,21 @@ make coverage
 
 ### 테스트 커버리지
 
-현재 커버리지: **88%**
+현재 커버리지: **85%**
 
 ```
 Name                           Stmts   Miss  Cover
 --------------------------------------------------
-src/etl/config.py                 42      6    86%
-src/etl/consumer.py               99     16    84%
-src/etl/main.py                   55      1    98%
+src/etl/config.py                 62     11    82%
+src/etl/consumer.py              102     17    83%
+src/etl/main.py                   57      1    98%
 src/etl/models/message.py         44      0   100%
 src/etl/transfer/base.py          34      4    88%
-src/etl/transfer/ftp.py           81     16    80%
+src/etl/transfer/ftp.py           95     31    67%
+src/etl/transfer/local.py         42      3    93%
+src/etl/transfer/pool.py         138     18    87%
 --------------------------------------------------
-TOTAL                            361     43    88%
+TOTAL                            582     85    85%
 ```
 
 ### 성능 테스트 결과
@@ -579,6 +581,8 @@ sequenceDiagram
     participant C as Consumer
     participant CF as ConfigLoader
     participant T as TransferFactory
+    participant PM as FTPPoolManager
+    participant P as FTPConnectionPool
     participant SRC as Source FTP
     participant DST as Dest FTP
     participant DLQ as DLQ Topic
@@ -590,12 +594,20 @@ sequenceDiagram
     C->>T: Transfer 생성
     T-->>C: FTPTransfer
 
+    rect rgb(240, 248, 255)
+        Note over C,P: FTP 연결 풀링
+        C->>PM: get_pool(config)
+        PM->>P: borrow()
+        P-->>C: PooledConnection
+    end
+
     C->>SRC: download()
     SRC-->>C: 파일 데이터
 
     C->>DST: upload()
     DST-->>C: 완료
 
+    C->>P: return_connection()
     C->>K: offset commit
 
     alt 실패 시
