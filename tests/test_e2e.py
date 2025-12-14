@@ -317,6 +317,9 @@ class TestLocalToFTPTransfer:
         local_src = shared_test_dir["source"] / f"to_ftp_{timestamp}.txt"
         local_src.write_text(test_content)
 
+        # Wait for Docker Desktop volume sync
+        time.sleep(2)
+
         # 2. Send Kafka message
         job = {
             "job_id": f"local-to-ftp-{timestamp}",
@@ -367,6 +370,9 @@ class TestLocalToLocalTransfer:
         # 1. Create source file
         local_src = shared_test_dir["source"] / f"local_src_{timestamp}.txt"
         local_src.write_text(test_content)
+
+        # Wait for Docker Desktop volume sync
+        time.sleep(2)
 
         # 2. Send Kafka message
         job = {

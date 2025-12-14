@@ -120,7 +120,8 @@ def dest_config(test_env_file):
 
 
 # Local transfer fixtures for E2E tests
-SHARED_TEST_DIR = "/tmp/etl-test-shared"
+# Note: Use a path accessible by Docker Desktop (macOS shares /Users by default)
+SHARED_TEST_DIR = str(Path(__file__).parent.parent / ".etl-test-shared")
 
 
 @pytest.fixture
@@ -128,21 +129,41 @@ def shared_test_dir():
     """Create shared directory for container-host file sharing.
 
     This directory is mounted as a volume in docker-compose.test.yml:
-    Host: /tmp/etl-test-shared -> Container: /shared
-    """
-    src_dir = Path(SHARED_TEST_DIR) / "source"
-    dst_dir = Path(SHARED_TEST_DIR) / "destination"
+    Host: .etl-test-shared -> Container: /shared
 
-    # Clean and recreate directories
+    Note: We preserve the base directory to maintain the Docker bind mount.
+    Only the contents of subdirectories are cleaned between tests.
+    """
+    base_dir = Path(SHARED_TEST_DIR)
+    src_dir = base_dir / "source"
+    dst_dir = base_dir / "destination"
+
+    # Ensure base directory exists (preserve bind mount)
+    base_dir.mkdir(parents=True, exist_ok=True)
+
+    # Clean subdirectory contents (not the directories themselves)
     for d in [src_dir, dst_dir]:
         if d.exists():
-            shutil.rmtree(d)
-        d.mkdir(parents=True)
+            # Remove all files in the directory
+            for item in d.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
+        else:
+            d.mkdir(parents=True)
 
     yield {"source": src_dir, "destination": dst_dir}
 
-    # Cleanup after test
-    shutil.rmtree(SHARED_TEST_DIR, ignore_errors=True)
+    # Don't delete base directory - preserve bind mount for container
+    # Only clean contents after test
+    for d in [src_dir, dst_dir]:
+        if d.exists():
+            for item in d.iterdir():
+                if item.is_file():
+                    item.unlink()
+                elif item.is_dir():
+                    shutil.rmtree(item)
 
 
 @pytest.fixture
