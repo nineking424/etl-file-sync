@@ -44,6 +44,8 @@ flowchart LR
 - **FTP 파일 전송**: Source FTP에서 Destination FTP로 파일 전송
 - **DLQ 지원**: 실패한 작업은 Dead Letter Queue로 이동
 - **단일 컨테이너 배포**: Kafka 브로커 + ETL Consumer를 하나의 컨테이너로 실행
+- **Multi-Consumer 지원**: 컨테이너 내에서 여러 Consumer 인스턴스 동시 실행
+- **토픽 자동 생성**: 컨테이너 시작 시 Kafka 토픽 및 DLQ 토픽 자동 생성
 - **확장 가능한 구조**: S3 등 다른 전송 프로토콜 추가 가능
 
 ## 기술 스택
@@ -113,6 +115,23 @@ docker run --env-file .env etl-file-sync \
 | `--bootstrap-servers` | Kafka 브로커 주소 | `localhost:9092` |
 | `--env-file` | .env 파일 경로 | - |
 | `-v, --verbose` | 디버그 로그 활성화 | `false` |
+
+### 컨테이너 환경변수
+
+| 환경변수 | 설명 | 기본값 |
+|---------|------|--------|
+| `ETL_CONSUMER_COUNT` | 컨테이너 내 Consumer 인스턴스 수 | `1` |
+| `ETL_NUM_PARTITIONS` | 토픽 자동 생성 시 파티션 수 | `4` |
+
+### Multi-Consumer 실행 예시
+
+```bash
+# 단일 컨테이너에서 4개 Consumer 실행
+docker run --env-file .env \
+    -e ETL_CONSUMER_COUNT=4 \
+    -e ETL_NUM_PARTITIONS=4 \
+    etl-file-sync file-transfer-jobs etl-worker-group localhost:9092
+```
 
 ## 병렬 처리 실행
 
@@ -201,6 +220,10 @@ FTP_PASSIVE_MODE=true              # Passive 모드 (기본값: true)
 # DLQ 설정
 DLQ_TOPIC_SUFFIX=-dlq              # DLQ 토픽 suffix (토픽별 자동 생성)
                                    # 예: mem-dft-img -> mem-dft-img-dlq
+
+# 타임아웃 설정
+FTP_CONNECT_TIMEOUT=30             # FTP 연결 타임아웃 (초)
+DLQ_SEND_TIMEOUT=10                # DLQ 메시지 전송 타임아웃 (초)
 
 # 서버 정의 형식: {HOSTNAME}_{PROPERTY}
 SRC_FTP_SERVER1_TYPE=ftp
@@ -308,24 +331,14 @@ pytest -m unit -v
 # 1. Docker 이미지 빌드 (최초 1회)
 docker build -t etl-file-sync -f docker/Dockerfile .
 
-# 2. Kafka 테스트 인프라 시작
+# 2. Kafka 테스트 인프라 시작 (토픽 자동 생성됨)
 docker-compose -f docker-compose.test.yml up -d
 
-# 3. Kafka 토픽 생성 (최초 1회)
-docker exec etl-test /opt/kafka/bin/kafka-topics.sh \
-    --bootstrap-server localhost:9092 \
-    --create --topic test-transfer --partitions 1 --replication-factor 1
-
-docker exec etl-test /opt/kafka/bin/kafka-topics.sh \
-    --bootstrap-server localhost:9092 \
-    --create --topic test-transfer-dlq --partitions 1 --replication-factor 1
-
-# 4. Consumer 재시작 (토픽 생성 후)
-docker exec etl-test supervisorctl restart etl-consumer
-
-# 5. 전체 테스트 실행
+# 3. 전체 테스트 실행
 pytest -v --cov=src/etl --cov-report=term-missing
 ```
+
+> **참고**: Kafka 토픽(`test-transfer`, `test-transfer-dlq`)은 컨테이너 시작 시 자동으로 생성됩니다.
 
 #### 특정 테스트만
 
@@ -356,6 +369,21 @@ src/etl/transfer/ftp.py           81     16    80%
 --------------------------------------------------
 TOTAL                            361     43    88%
 ```
+
+### Kafka UI 모니터링
+
+테스트 환경에는 Kafka UI가 포함되어 있어 브라우저에서 토픽, 메시지, Consumer Group 상태를 확인할 수 있습니다.
+
+```bash
+# 테스트 환경 시작 후 접속
+# http://localhost:8080
+```
+
+| 기능 | 설명 |
+|------|------|
+| Topics | 토픽 목록 및 메시지 확인 |
+| Consumers | Consumer Group 상태 및 Lag 모니터링 |
+| Brokers | Kafka 브로커 상태 확인 |
 
 ### 테스트 환경 정리
 
