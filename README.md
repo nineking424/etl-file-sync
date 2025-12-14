@@ -421,6 +421,29 @@ pytest -m e2e -v
 pytest tests/test_health.py -v
 ```
 
+### HTML 테스트 리포트 생성
+
+```bash
+# 기본 HTML 리포트 생성
+pytest -v --html=reports/report.html --self-contained-html
+
+# 커버리지 + HTML 리포트 동시 생성
+pytest -v --cov=src/etl --cov-report=html:reports/coverage \
+    --html=reports/report.html --self-contained-html
+
+# E2E 테스트만 HTML 리포트 생성
+pytest -m e2e -v --html=reports/e2e-report.html --self-contained-html
+
+# 모든 리포트 생성 (Makefile)
+make coverage
+```
+
+> **참고**: `--self-contained-html` 옵션은 CSS/JS를 HTML 파일에 내장하여 단일 파일로 공유 가능하게 합니다.
+
+생성된 리포트:
+- `reports/report.html` - 테스트 실행 결과 리포트
+- `reports/coverage/index.html` - 코드 커버리지 리포트
+
 ### 테스트 커버리지
 
 현재 커버리지: **88%**
