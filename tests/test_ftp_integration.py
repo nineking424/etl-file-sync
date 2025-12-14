@@ -15,13 +15,15 @@ from etl.config import ConfigLoader
 from etl.transfer.ftp import FTPTransfer
 
 
-# Check if FTP servers are available
+# Check if FTP servers are available (environment-based)
 def is_ftp_available():
     """Check if test FTP servers are running."""
     import socket
 
+    host = os.getenv("SRC_FTP_SERVER1_HOST", "localhost")
+    port = int(os.getenv("SRC_FTP_SERVER1_PORT", "21"))
     try:
-        sock = socket.create_connection(("localhost", 2121), timeout=2)
+        sock = socket.create_connection((host, port), timeout=2)
         sock.close()
         return True
     except (socket.error, socket.timeout):

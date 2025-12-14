@@ -7,6 +7,7 @@ Usage:
     pytest tests/test_health.py -v
 """
 
+import os
 import socket
 
 import pytest
@@ -27,11 +28,15 @@ class TestInfrastructureHealth:
 
     def test_ftp_source_available(self):
         """FTP source server must be reachable."""
-        check_connection("localhost", 2121)
+        host = os.getenv("SRC_FTP_SERVER1_HOST", "localhost")
+        port = int(os.getenv("SRC_FTP_SERVER1_PORT", "21"))
+        check_connection(host, port)
 
     def test_ftp_dest_available(self):
         """FTP destination server must be reachable."""
-        check_connection("localhost", 2122)
+        host = os.getenv("DST_FTP_SERVER1_HOST", "localhost")
+        port = int(os.getenv("DST_FTP_SERVER1_PORT", "21"))
+        check_connection(host, port)
 
 
 @pytest.mark.e2e
