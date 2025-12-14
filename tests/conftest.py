@@ -156,3 +156,109 @@ def dest_config(test_env_file):
 
     config = ConfigLoader(test_env_file)
     return config.get_server_config("DST_FTP_SERVER1")
+
+
+# =============================================================================
+# Priority-Based Test Ordering
+# =============================================================================
+
+# Priority mapping: lower number = higher priority (runs first)
+MARKER_PRIORITY = {
+    "e2e": 1,
+    "integration": 2,
+    "unit": 3,
+}
+
+DEFAULT_PRIORITY = 99  # Tests without markers run last
+
+
+def get_test_priority(item):
+    """Get priority for a test item based on its markers."""
+    for marker_name, priority in MARKER_PRIORITY.items():
+        if marker_name in item.keywords:
+            return priority
+    return DEFAULT_PRIORITY
+
+
+def pytest_collection_modifyitems(session, config, items):
+    """
+    Reorder tests by priority within a single pytest run.
+
+    Priority Order:
+    1. E2E tests (highest priority) - validate full system
+    2. Integration tests - validate component interactions
+    3. Unit tests (lowest priority) - validate individual units
+
+    This ensures that when running all tests together,
+    higher priority tests execute first.
+    """
+    # Sort items by priority (stable sort preserves order within same priority)
+    items.sort(key=get_test_priority)
+
+
+# =============================================================================
+# Session-Level Result Tracking (for conditional execution)
+# =============================================================================
+
+
+class PriorityTestResults:
+    """Track test results by priority level."""
+
+    def __init__(self):
+        self.results = {
+            "e2e": {"passed": 0, "failed": 0, "skipped": 0},
+            "integration": {"passed": 0, "failed": 0, "skipped": 0},
+            "unit": {"passed": 0, "failed": 0, "skipped": 0},
+        }
+
+    def record(self, item, outcome):
+        """Record a test result."""
+        for marker_name in self.results.keys():
+            if marker_name in item.keywords:
+                self.results[marker_name][outcome] += 1
+                break
+
+    def has_failures(self, marker_name):
+        """Check if a priority level has failures."""
+        return self.results.get(marker_name, {}).get("failed", 0) > 0
+
+    def all_passed(self, marker_name):
+        """Check if all tests in a priority level passed."""
+        result = self.results.get(marker_name, {})
+        return result.get("failed", 0) == 0 and result.get("passed", 0) > 0
+
+
+# Global results tracker
+_priority_results = PriorityTestResults()
+
+
+@pytest.hookimpl(tryfirst=True, hookwrapper=True)
+def pytest_runtest_makereport(item, call):
+    """Track test results by priority level."""
+    outcome = yield
+    report = outcome.get_result()
+
+    if report.when == "call":
+        if report.passed:
+            _priority_results.record(item, "passed")
+        elif report.failed:
+            _priority_results.record(item, "failed")
+        elif report.skipped:
+            _priority_results.record(item, "skipped")
+
+
+def pytest_terminal_summary(terminalreporter, exitstatus, config):
+    """Add priority-based summary to test output."""
+    terminalreporter.write_sep("=", "Priority-Based Test Summary")
+
+    for marker_name in ["e2e", "integration", "unit"]:
+        result = _priority_results.results[marker_name]
+        total = result["passed"] + result["failed"] + result["skipped"]
+
+        if total > 0:
+            status = "PASSED" if result["failed"] == 0 else "FAILED"
+            terminalreporter.write_line(
+                f"  {marker_name.upper():12} - {status}: "
+                f"{result['passed']} passed, {result['failed']} failed, "
+                f"{result['skipped']} skipped"
+            )
