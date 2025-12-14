@@ -46,6 +46,58 @@ feat: Add user authentication
 Test: 5 passed, 0 failed
 ```
 
+## Testing
+
+### Test Commands
+
+```bash
+# Activate virtual environment first
+source .venv/bin/activate
+
+# Unit tests only (no infrastructure required)
+pytest -m unit -v
+
+# Integration tests (requires FTP server)
+pytest -m integration -v
+
+# E2E tests (requires FTP + Kafka)
+pytest -m e2e -v
+
+# All tests
+pytest -v
+
+# With coverage report
+pytest --cov=src/etl --cov-report=term-missing
+```
+
+### Test Markers
+
+| Marker | Description | Infrastructure Required |
+|--------|-------------|------------------------|
+| `unit` | Unit tests with mocks | None |
+| `integration` | FTP integration tests | FTP Server |
+| `e2e` | End-to-end tests | FTP + Kafka |
+
+### FTP Test Server Configuration
+
+**Server**: `192.168.1.4:21`
+
+| User | Password | Permission Path |
+|------|----------|-----------------|
+| user01 | Votmdnjem01! | `/testserver01` |
+| user02 | Votmdnjem02! | `/testserver02` |
+
+**Important**: When writing FTP tests, always use the permission paths:
+- Source (user01): `/testserver01/...`
+- Destination (user02): `/testserver02/...`
+
+### Test Environment File
+
+Test configuration is stored in `.env.test`. This file contains:
+- FTP server connection info
+- Kafka settings
+- DLQ configuration
+
 ## Git Workflow
 
 All changes must be committed to git and pushed to the remote repository.
