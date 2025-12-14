@@ -35,11 +35,23 @@ class ConfigLoader:
 
         self._ftp_passive_mode = self._get_bool("FTP_PASSIVE_MODE", True)
         self._dlq_topic_suffix = os.getenv("DLQ_TOPIC_SUFFIX", "-dlq")
+        self._ftp_connect_timeout = int(os.getenv("FTP_CONNECT_TIMEOUT", "30"))
+        self._dlq_send_timeout = int(os.getenv("DLQ_SEND_TIMEOUT", "10"))
 
     @property
     def ftp_passive_mode(self) -> bool:
         """Get FTP passive mode setting."""
         return self._ftp_passive_mode
+
+    @property
+    def ftp_connect_timeout(self) -> int:
+        """Get FTP connection timeout in seconds."""
+        return self._ftp_connect_timeout
+
+    @property
+    def dlq_send_timeout(self) -> int:
+        """Get DLQ message send timeout in seconds."""
+        return self._dlq_send_timeout
 
     def get_dlq_topic(self, source_topic: str) -> str:
         """Get DLQ topic name for a given source topic.

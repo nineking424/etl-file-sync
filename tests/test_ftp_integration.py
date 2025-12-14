@@ -11,23 +11,8 @@ from pathlib import Path
 
 import pytest
 
-from etl.config import ConfigLoader
+from .conftest import is_ftp_available
 from etl.transfer.ftp import FTPTransfer
-
-
-# Check if FTP servers are available (environment-based)
-def is_ftp_available():
-    """Check if test FTP servers are running."""
-    import socket
-
-    host = os.getenv("SRC_FTP_SERVER1_HOST", "localhost")
-    port = int(os.getenv("SRC_FTP_SERVER1_PORT", "21"))
-    try:
-        sock = socket.create_connection((host, port), timeout=2)
-        sock.close()
-        return True
-    except (socket.error, socket.timeout):
-        return False
 
 
 # Mark all tests as integration tests
@@ -42,24 +27,6 @@ def require_ftp_infrastructure():
             "FTP infrastructure required but not available. "
             "Run: docker-compose -f docker-compose.test.yml up -d"
         )
-
-
-@pytest.fixture
-def config(test_env_file):
-    """Get test configuration."""
-    return ConfigLoader(test_env_file)
-
-
-@pytest.fixture
-def source_config(config):
-    """Get source FTP server config."""
-    return config.get_server_config("SRC_FTP_SERVER1")
-
-
-@pytest.fixture
-def dest_config(config):
-    """Get destination FTP server config."""
-    return config.get_server_config("DST_FTP_SERVER1")
 
 
 @pytest.fixture

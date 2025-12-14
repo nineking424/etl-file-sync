@@ -17,15 +17,19 @@ logger = logging.getLogger(__name__)
 class FTPTransfer(BaseTransfer):
     """FTP file transfer handler."""
 
-    def __init__(self, config: "ServerConfig", passive_mode: bool = True):
+    def __init__(
+        self, config: "ServerConfig", passive_mode: bool = True, timeout: int = 30
+    ):
         """Initialize FTP transfer handler.
 
         Args:
             config: Server configuration
             passive_mode: Use passive mode (default: True)
+            timeout: Connection timeout in seconds (default: 30)
         """
         super().__init__(config)
         self.passive_mode = passive_mode
+        self.timeout = timeout
         self._ftp: ftplib.FTP | None = None
 
     def connect(self) -> None:
@@ -40,7 +44,7 @@ class FTPTransfer(BaseTransfer):
             )
 
             self._ftp = ftplib.FTP()
-            self._ftp.connect(self.config.host, self.config.port, timeout=30)
+            self._ftp.connect(self.config.host, self.config.port, timeout=self.timeout)
             self._ftp.login(self.config.username, self.config.password)
 
             # Set passive/active mode

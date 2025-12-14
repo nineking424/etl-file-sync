@@ -12,31 +12,12 @@ Prerequisites:
 
 import json
 import os
-import socket
 import tempfile
 import time
 
 import pytest
 
-
-def is_ftp_available():
-    """Check if test FTP servers are running."""
-    try:
-        sock = socket.create_connection(("localhost", 2121), timeout=2)
-        sock.close()
-        return True
-    except (socket.error, socket.timeout):
-        return False
-
-
-def is_kafka_available():
-    """Check if Kafka is running."""
-    try:
-        sock = socket.create_connection(("localhost", 9092), timeout=2)
-        sock.close()
-        return True
-    except (socket.error, socket.timeout):
-        return False
+from .conftest import is_ftp_available, is_kafka_available
 
 
 # Mark all tests as E2E tests

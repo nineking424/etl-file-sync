@@ -7,6 +7,7 @@ from pathlib import Path
 from typing import Optional
 
 from kafka import KafkaConsumer, KafkaProducer
+from kafka.consumer.fetcher import ConsumerRecord
 
 from .config import ConfigLoader, get_config
 from .models import DLQMessage, FileTransferJob
@@ -96,7 +97,7 @@ class FileTransferConsumer:
                 for message in messages:
                     self._process_message(message)
 
-    def _process_message(self, message) -> None:
+    def _process_message(self, message: ConsumerRecord) -> None:
         """Process a single message.
 
         Args:
@@ -157,9 +158,10 @@ class FileTransferConsumer:
             logger.info(f"Downloading from {src_config.host}...")
             src_transfer = TransferFactory.create(src_config)
 
-            # Set passive mode for FTP
+            # Set passive mode and timeout for FTP
             if isinstance(src_transfer, FTPTransfer):
                 src_transfer.passive_mode = self.config.ftp_passive_mode
+                src_transfer.timeout = self.config.ftp_connect_timeout
 
             with src_transfer:
                 src_transfer.download(job.source.path, tmp_path)
@@ -168,9 +170,10 @@ class FileTransferConsumer:
             logger.info(f"Uploading to {dst_config.host}...")
             dst_transfer = TransferFactory.create(dst_config)
 
-            # Set passive mode for FTP
+            # Set passive mode and timeout for FTP
             if isinstance(dst_transfer, FTPTransfer):
                 dst_transfer.passive_mode = self.config.ftp_passive_mode
+                dst_transfer.timeout = self.config.ftp_connect_timeout
 
             with dst_transfer:
                 dst_transfer.upload(tmp_path, job.destination.path)
