@@ -11,6 +11,7 @@ __pycache__/
 .coverage
 .pytest_cache/
 htmlcov/
+reports/
 
 # Virtual Environment
 .venv/
