@@ -61,6 +61,8 @@ pytest -m unit -v
 pytest -m integration -v
 
 # E2E tests (requires FTP + Kafka)
+# First, start the test infrastructure:
+docker-compose -f docker-compose.test.yml up -d
 pytest -m e2e -v
 
 # All tests
@@ -69,6 +71,29 @@ pytest -v
 # With coverage report
 pytest --cov=src/etl --cov-report=term-missing
 ```
+
+### E2E Test Infrastructure
+
+E2E tests require a Docker container running Kafka broker and ETL consumer.
+
+```bash
+# Start infrastructure
+docker-compose -f docker-compose.test.yml up -d
+
+# Check container status
+docker ps | grep etl-test
+
+# View logs
+docker logs etl-test
+
+# Stop infrastructure
+docker-compose -f docker-compose.test.yml down
+```
+
+**Container Architecture:**
+- Single container (`etl-test`) runs both Kafka and Consumer via supervisord
+- Kafka broker: `localhost:9092`
+- Consumer subscribes to: `test-transfer` topic
 
 ### Test Markers
 

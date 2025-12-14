@@ -27,9 +27,14 @@ pytestmark = pytest.mark.e2e
 @pytest.fixture(autouse=True)
 def require_full_infrastructure():
     """Ensure full infrastructure is available. FAIL if not."""
+    import os
+
+    ftp_host = os.getenv("SRC_FTP_SERVER1_HOST", "localhost")
+    ftp_port = os.getenv("SRC_FTP_SERVER1_PORT", "21")
+
     missing = []
     if not is_ftp_available():
-        missing.append("FTP (localhost:2121)")
+        missing.append(f"FTP ({ftp_host}:{ftp_port})")
     if not is_kafka_available():
         missing.append("Kafka (localhost:9092)")
 
