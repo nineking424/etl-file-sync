@@ -46,6 +46,52 @@ feat: Add user authentication
 Test: 5 passed, 0 failed
 ```
 
+## Docker Build
+
+### Cross-Platform Build (Required)
+
+Always build Docker images with multi-platform support for both development (arm64) and production (amd64) environments.
+
+```bash
+# Build multi-platform image
+docker buildx build --platform linux/amd64,linux/arm64 -t <image-name>:<tag> .
+
+# Build and push to registry
+docker buildx build --platform linux/amd64,linux/arm64 -t <image-name>:<tag> --push .
+
+# Build for specific platform only
+docker buildx build --platform linux/amd64 -t <image-name>:<tag> .
+```
+
+**Important**:
+- Development environment uses Intel/ARM Silicon (arm64)
+- Production environment requires amd64 support
+- Always use `--platform` flag to ensure cross-platform compatibility
+
+## Testing Philosophy
+
+### Priority-Based Test Strategy
+
+This project uses a priority-based test execution strategy to optimize testing efficiency:
+
+**Core Principle:** If high-priority tests pass, the system is validated. If they fail, lower-priority tests help diagnose the root cause.
+
+| Priority | Marker | Purpose | Execution Rule |
+|----------|--------|---------|----------------|
+| 1 (Highest) | `e2e` | Full pipeline validation | Always runs first |
+| 2 | `integration` | Component interactions | Only if E2E fails |
+| 3 (Lowest) | `unit` | Individual units | Only if higher tests fail |
+
+### Root Cause Diagnosis
+
+When tests fail, the priority system helps identify root causes:
+
+| Failure Pattern | Diagnosis |
+|-----------------|-----------|
+| Unit tests fail | Core logic/model issues |
+| Integration fail, Unit pass | FTP connectivity or configuration issues |
+| E2E fail, others pass | Kafka connectivity, consumer logic, or pipeline integration issues |
+
 ## Testing
 
 ### Test Commands
@@ -54,19 +100,27 @@ Test: 5 passed, 0 failed
 # Activate virtual environment first
 source .venv/bin/activate
 
-# Unit tests only (no infrastructure required)
-pytest -m unit -v
+# Recommended: Priority-based execution
+./scripts/run_tests.sh           # E2E first, skip lower if pass
+./scripts/run_tests.sh -v        # Verbose output
+./scripts/run_tests.sh --coverage # With coverage report
+./scripts/run_tests.sh --force-all # Run all tests regardless of results
 
-# Integration tests (requires FTP server)
-pytest -m integration -v
+# Using Makefile
+make test-priority      # Priority-based execution
+make test-priority-v    # Verbose priority execution
+make test-priority-all  # Force all tests
 
-# E2E tests (requires FTP + Kafka)
-# First, start the test infrastructure:
-docker-compose -f docker-compose.test.yml up -d
-pytest -m e2e -v
+# Individual test levels (for debugging)
+make test-e2e           # E2E tests only
+make test-integration   # Integration tests only
+make test-unit          # Unit tests only
 
-# All tests
-pytest -v
+# Legacy commands (still supported)
+pytest -m unit -v       # Unit tests only
+pytest -m integration -v # Integration tests only
+pytest -m e2e -v        # E2E tests only
+pytest -v               # All tests (ordered by priority)
 
 # With coverage report
 pytest --cov=src/etl --cov-report=term-missing
