@@ -219,7 +219,7 @@ class FileTransferConsumer:
 
         try:
             future = self._producer.send(dlq_topic, value=message)
-            future.get(timeout=10)  # Wait for send to complete
+            future.get(timeout=self.config.dlq_send_timeout)  # Wait for send to complete
             logger.info("Message sent to DLQ successfully")
         except Exception as e:
             logger.error(f"Failed to send message to DLQ: {e}")

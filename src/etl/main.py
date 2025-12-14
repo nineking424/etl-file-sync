@@ -4,6 +4,8 @@ import argparse
 import logging
 import signal
 import sys
+from types import FrameType
+from typing import Optional
 
 from .consumer import FileTransferConsumer
 
@@ -20,7 +22,7 @@ logger = logging.getLogger(__name__)
 _consumer: FileTransferConsumer | None = None
 
 
-def signal_handler(signum, frame):
+def signal_handler(signum: int, frame: Optional[FrameType]) -> None:
     """Handle shutdown signals."""
     logger.info(f"Received signal {signum}, shutting down...")
     if _consumer:
