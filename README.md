@@ -300,11 +300,15 @@ pytest -m unit -v
 
 #### 전체 테스트 (인프라 필요)
 
+**사전 요구사항:**
+- 실제 FTP 서버 (192.168.1.4)가 준비되어 있어야 합니다
+- `.env.test` 파일에 FTP 서버 연결 정보가 설정되어 있어야 합니다
+
 ```bash
 # 1. Docker 이미지 빌드 (최초 1회)
 docker build -t etl-file-sync -f docker/Dockerfile .
 
-# 2. 테스트 인프라 시작
+# 2. Kafka 테스트 인프라 시작
 docker-compose -f docker-compose.test.yml up -d
 
 # 3. Kafka 토픽 생성 (최초 1회)
