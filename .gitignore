@@ -27,4 +27,4 @@ ENV/
 # OS
 .DS_Store
 Thumbs.db
-.etl-test-shared/
+.shared/

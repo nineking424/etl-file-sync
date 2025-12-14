@@ -8,7 +8,7 @@ services:
     ports:
       - "9092:9092"
     volumes:
-      - ./.etl-test-shared:/shared
+      - ./.shared:/shared
     environment:
       # Multi-consumer configuration
       - ETL_CONSUMER_COUNT=4

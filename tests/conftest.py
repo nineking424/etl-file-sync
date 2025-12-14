@@ -121,7 +121,7 @@ def dest_config(test_env_file):
 
 # Local transfer fixtures for E2E tests
 # Note: Use a path accessible by Docker Desktop (macOS shares /Users by default)
-SHARED_TEST_DIR = str(Path(__file__).parent.parent / ".etl-test-shared")
+SHARED_TEST_DIR = str(Path(__file__).parent.parent / ".shared")
 
 
 @pytest.fixture
