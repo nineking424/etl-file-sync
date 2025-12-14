@@ -38,6 +38,11 @@ class ConfigLoader:
         self._ftp_connect_timeout = int(os.getenv("FTP_CONNECT_TIMEOUT", "30"))
         self._dlq_send_timeout = int(os.getenv("DLQ_SEND_TIMEOUT", "10"))
 
+        # FTP Connection Pool settings
+        self._ftp_pool_size = int(os.getenv("FTP_POOL_SIZE", "4"))
+        self._ftp_pool_max_wait = float(os.getenv("FTP_POOL_MAX_WAIT", "30.0"))
+        self._ftp_pool_idle_timeout = float(os.getenv("FTP_POOL_IDLE_TIMEOUT", "300.0"))
+
     @property
     def ftp_passive_mode(self) -> bool:
         """Get FTP passive mode setting."""
@@ -52,6 +57,21 @@ class ConfigLoader:
     def dlq_send_timeout(self) -> int:
         """Get DLQ message send timeout in seconds."""
         return self._dlq_send_timeout
+
+    @property
+    def ftp_pool_size(self) -> int:
+        """Get FTP connection pool size per server."""
+        return self._ftp_pool_size
+
+    @property
+    def ftp_pool_max_wait(self) -> float:
+        """Get max wait time for pool connection in seconds."""
+        return self._ftp_pool_max_wait
+
+    @property
+    def ftp_pool_idle_timeout(self) -> float:
+        """Get pool connection idle timeout in seconds."""
+        return self._ftp_pool_idle_timeout
 
     def get_dlq_topic(self, source_topic: str) -> str:
         """Get DLQ topic name for a given source topic.

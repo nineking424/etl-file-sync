@@ -4,12 +4,13 @@ import ftplib
 import logging
 import os
 from pathlib import Path
-from typing import TYPE_CHECKING
+from typing import TYPE_CHECKING, Optional
 
 from .base import BaseTransfer, TransferFactory
 
 if TYPE_CHECKING:
     from etl.config import ServerConfig
+    from .pool import PooledConnection
 
 logger = logging.getLogger(__name__)
 
@@ -18,7 +19,11 @@ class FTPTransfer(BaseTransfer):
     """FTP file transfer handler."""
 
     def __init__(
-        self, config: "ServerConfig", passive_mode: bool = True, timeout: int = 30
+        self,
+        config: "ServerConfig",
+        passive_mode: bool = True,
+        timeout: int = 30,
+        use_pool: bool = True,
     ):
         """Initialize FTP transfer handler.
 
@@ -26,41 +31,78 @@ class FTPTransfer(BaseTransfer):
             config: Server configuration
             passive_mode: Use passive mode (default: True)
             timeout: Connection timeout in seconds (default: 30)
+            use_pool: Use connection pooling (default: True)
         """
         super().__init__(config)
         self.passive_mode = passive_mode
         self.timeout = timeout
+        self.use_pool = use_pool
         self._ftp: ftplib.FTP | None = None
+        self._pooled_conn: Optional["PooledConnection"] = None
 
     def connect(self) -> None:
         """Establish FTP connection.
 
+        If use_pool is True, borrows a connection from the pool.
+        Otherwise, creates a direct connection.
+
         Raises:
             ConnectionError: If connection fails
+            TimeoutError: If pool is exhausted and max_wait exceeded
         """
-        try:
-            logger.info(
-                f"Connecting to FTP server: {self.config.host}:{self.config.port}"
+        if self.use_pool:
+            from .pool import FTPPoolManager
+
+            pool = FTPPoolManager.get_pool(
+                config=self.config,
+                timeout=self.timeout,
+                passive_mode=self.passive_mode,
             )
-
-            self._ftp = ftplib.FTP()
-            self._ftp.connect(self.config.host, self.config.port, timeout=self.timeout)
-            self._ftp.login(self.config.username, self.config.password)
-
-            # Set passive/active mode
-            self._ftp.set_pasv(self.passive_mode)
-            mode = "passive" if self.passive_mode else "active"
-            logger.info(f"FTP connection established ({mode} mode)")
-
-        except ftplib.all_errors as e:
-            raise ConnectionError(
-                f"Failed to connect to FTP server "
-                f"{self.config.host}:{self.config.port}: {e}"
+            self._pooled_conn = pool.borrow()
+            self._ftp = self._pooled_conn.ftp
+            logger.debug(
+                f"Borrowed pooled connection to {self.config.host}:{self.config.port}"
             )
+        else:
+            # Direct connection (no pooling)
+            try:
+                logger.info(
+                    f"Connecting to FTP server: {self.config.host}:{self.config.port}"
+                )
+
+                self._ftp = ftplib.FTP()
+                self._ftp.connect(
+                    self.config.host, self.config.port, timeout=self.timeout
+                )
+                self._ftp.login(self.config.username, self.config.password)
+
+                # Set passive/active mode
+                self._ftp.set_pasv(self.passive_mode)
+                mode = "passive" if self.passive_mode else "active"
+                logger.info(f"FTP connection established ({mode} mode)")
+
+            except ftplib.all_errors as e:
+                raise ConnectionError(
+                    f"Failed to connect to FTP server "
+                    f"{self.config.host}:{self.config.port}: {e}"
+                )
 
     def disconnect(self) -> None:
-        """Close FTP connection."""
-        if self._ftp:
+        """Close FTP connection.
+
+        If using pooling, returns connection to pool.
+        Otherwise, closes the direct connection.
+        """
+        if self._pooled_conn:
+            # Return to pool
+            self._pooled_conn._pool.return_connection(self._pooled_conn)
+            logger.debug(
+                f"Returned pooled connection to {self.config.host}:{self.config.port}"
+            )
+            self._pooled_conn = None
+            self._ftp = None
+        elif self._ftp:
+            # Direct connection - close it
             try:
                 self._ftp.quit()
                 logger.info("FTP connection closed")
