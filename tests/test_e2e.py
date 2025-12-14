@@ -243,3 +243,243 @@ class TestDLQPipeline:
         # Verify our invalid message is in DLQ
         assert found_message, \
             f"Expected timestamp {timestamp} in DLQ within {E2E_TIMEOUT}s. Got: {dlq_messages}"
+
+
+class TestFTPToLocalTransfer:
+    """Test FTP to Local file transfer."""
+
+    def test_ftp_to_local_transfer(
+        self, kafka_producer, source_config, shared_test_dir
+    ):
+        """
+        Given: File on source FTP
+        When: Send Kafka message (source=FTP, dest=Local)
+        Then: File appears in shared local directory
+        """
+        from etl.transfer.ftp import FTPTransfer
+
+        test_content = f"FTP to Local test - {time.time()}"
+        timestamp = int(time.time())
+        src_path = f"/testserver01/ftp_to_local_{timestamp}.txt"
+        dst_path = f"/shared/destination/from_ftp_{timestamp}.txt"
+
+        # 1. Upload to source FTP
+        with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+            f.write(test_content)
+            local_path = f.name
+
+        try:
+            with FTPTransfer(source_config, passive_mode=True) as src:
+                src.upload(local_path, src_path)
+
+            # 2. Send Kafka message
+            job = {
+                "job_id": f"ftp-to-local-{timestamp}",
+                "source": {"hostname": "SRC_FTP_SERVER1", "path": src_path},
+                "destination": {"hostname": "LOCAL_SERVER1", "path": dst_path}
+            }
+            kafka_producer.send("test-transfer", value=json.dumps(job))
+            kafka_producer.flush()
+
+            # 3. Verify file appears locally
+            local_dst = shared_test_dir["destination"] / f"from_ftp_{timestamp}.txt"
+
+            def check_local_file():
+                return local_dst.exists()
+
+            assert wait_for_condition(check_local_file, timeout=E2E_TRANSFER_TIMEOUT), \
+                f"File not transferred within {E2E_TRANSFER_TIMEOUT}s timeout"
+            assert local_dst.read_text() == test_content
+
+        finally:
+            os.unlink(local_path)
+
+
+class TestLocalToFTPTransfer:
+    """Test Local to FTP file transfer."""
+
+    def test_local_to_ftp_transfer(
+        self, kafka_producer, dest_config, shared_test_dir
+    ):
+        """
+        Given: File in shared local directory
+        When: Send Kafka message (source=Local, dest=FTP)
+        Then: File appears on destination FTP
+        """
+        from etl.transfer.ftp import FTPTransfer
+
+        test_content = f"Local to FTP test - {time.time()}"
+        timestamp = int(time.time())
+        src_path = f"/shared/source/to_ftp_{timestamp}.txt"
+        dst_path = f"/testserver02/from_local_{timestamp}.txt"
+
+        # 1. Create local file in shared directory
+        local_src = shared_test_dir["source"] / f"to_ftp_{timestamp}.txt"
+        local_src.write_text(test_content)
+
+        # 2. Send Kafka message
+        job = {
+            "job_id": f"local-to-ftp-{timestamp}",
+            "source": {"hostname": "LOCAL_SERVER1", "path": src_path},
+            "destination": {"hostname": "DST_FTP_SERVER1", "path": dst_path}
+        }
+        kafka_producer.send("test-transfer", value=json.dumps(job))
+        kafka_producer.flush()
+
+        # 3. Verify file on FTP
+        downloaded_content = None
+
+        def check_ftp_file():
+            nonlocal downloaded_content
+            try:
+                with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                    tmp_path = tmp.name
+                with FTPTransfer(dest_config, passive_mode=True) as dst:
+                    dst.download(dst_path, tmp_path)
+                with open(tmp_path, "r") as f:
+                    downloaded_content = f.read()
+                os.unlink(tmp_path)
+                return True
+            except Exception:
+                return False
+
+        assert wait_for_condition(check_ftp_file, timeout=E2E_TRANSFER_TIMEOUT), \
+            f"File not transferred within {E2E_TRANSFER_TIMEOUT}s timeout"
+        assert downloaded_content == test_content
+
+
+class TestLocalToLocalTransfer:
+    """Test Local to Local file transfer."""
+
+    def test_local_to_local_transfer(
+        self, kafka_producer, shared_test_dir
+    ):
+        """
+        Given: File in shared source directory
+        When: Send Kafka message (source=Local, dest=Local)
+        Then: File appears in shared destination directory
+        """
+        test_content = f"Local to Local test - {time.time()}"
+        timestamp = int(time.time())
+        src_path = f"/shared/source/local_src_{timestamp}.txt"
+        dst_path = f"/shared/destination/local_dst_{timestamp}.txt"
+
+        # 1. Create source file
+        local_src = shared_test_dir["source"] / f"local_src_{timestamp}.txt"
+        local_src.write_text(test_content)
+
+        # 2. Send Kafka message
+        job = {
+            "job_id": f"local-to-local-{timestamp}",
+            "source": {"hostname": "LOCAL_SERVER1", "path": src_path},
+            "destination": {"hostname": "LOCAL_SERVER1", "path": dst_path}
+        }
+        kafka_producer.send("test-transfer", value=json.dumps(job))
+        kafka_producer.flush()
+
+        # 3. Verify destination file
+        local_dst = shared_test_dir["destination"] / f"local_dst_{timestamp}.txt"
+
+        def check_local_file():
+            return local_dst.exists()
+
+        assert wait_for_condition(check_local_file, timeout=E2E_TRANSFER_TIMEOUT), \
+            f"File not transferred within {E2E_TRANSFER_TIMEOUT}s timeout"
+        assert local_dst.read_text() == test_content
+
+
+@pytest.mark.slow
+class TestBulkTransfer:
+    """Test bulk file transfers."""
+
+    def test_ftp_to_ftp_bulk_transfer(
+        self, kafka_producer, source_config, dest_config
+    ):
+        """
+        Given: 1000 files on source FTP
+        When: Send 1000 Kafka messages
+        Then: All files appear on destination FTP
+        """
+        from etl.transfer.ftp import FTPTransfer
+
+        FILE_COUNT = 1000
+        BULK_TIMEOUT = 300.0  # 5 minutes for bulk transfer
+        timestamp = int(time.time())
+
+        # Track files
+        files = []
+
+        # 1. Generate and upload files to source FTP
+        with FTPTransfer(source_config, passive_mode=True) as src:
+            for i in range(FILE_COUNT):
+                content = f"Bulk file {i} - {timestamp}"
+                src_path = f"/testserver01/bulk_{timestamp}_{i:04d}.txt"
+                dst_path = f"/testserver02/bulk_{timestamp}_{i:04d}.txt"
+
+                with tempfile.NamedTemporaryFile(mode="w", delete=False) as f:
+                    f.write(content)
+                    tmp_path = f.name
+
+                src.upload(tmp_path, src_path)
+                os.unlink(tmp_path)
+
+                files.append({
+                    "src": src_path,
+                    "dst": dst_path,
+                    "content": content
+                })
+
+        # 2. Send Kafka messages
+        for i, file_info in enumerate(files):
+            job = {
+                "job_id": f"bulk-{timestamp}-{i:04d}",
+                "source": {"hostname": "SRC_FTP_SERVER1", "path": file_info["src"]},
+                "destination": {"hostname": "DST_FTP_SERVER1", "path": file_info["dst"]}
+            }
+            kafka_producer.send("test-transfer", value=json.dumps(job))
+        kafka_producer.flush()
+
+        # 3. Wait and verify transfers
+        success_count = 0
+        fail_count = 0
+        start_time = time.time()
+
+        def check_all_transferred():
+            nonlocal success_count, fail_count
+            success_count = 0
+            fail_count = 0
+
+            with FTPTransfer(dest_config, passive_mode=True) as dst:
+                for file_info in files:
+                    try:
+                        with tempfile.NamedTemporaryFile(delete=False) as tmp:
+                            tmp_path = tmp.name
+                        dst.download(file_info["dst"], tmp_path)
+                        with open(tmp_path, "r") as f:
+                            if f.read() == file_info["content"]:
+                                success_count += 1
+                            else:
+                                fail_count += 1
+                        os.unlink(tmp_path)
+                    except Exception:
+                        fail_count += 1
+
+            return success_count == FILE_COUNT
+
+        result = wait_for_condition(
+            check_all_transferred,
+            timeout=BULK_TIMEOUT,
+            interval=5.0  # Check every 5 seconds for bulk
+        )
+
+        elapsed = time.time() - start_time
+
+        # Report results
+        print(f"\n=== Bulk Transfer Results ===")
+        print(f"Total files: {FILE_COUNT}")
+        print(f"Success: {success_count}")
+        print(f"Failed: {fail_count}")
+        print(f"Elapsed: {elapsed:.2f}s")
+        print(f"Rate: {success_count/elapsed:.2f} files/sec")
+
+        assert result, f"Bulk transfer incomplete: {success_count}/{FILE_COUNT} succeeded"

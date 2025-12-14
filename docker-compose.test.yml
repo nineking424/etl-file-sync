@@ -7,6 +7,8 @@ services:
     container_name: etl-test
     ports:
       - "9092:9092"
+    volumes:
+      - /tmp/etl-test-shared:/shared
     environment:
       # Multi-consumer configuration
       - ETL_CONSUMER_COUNT=4
@@ -24,6 +26,13 @@ services:
       - DST_FTP_SERVER1_PORT=21
       - DST_FTP_SERVER1_USER=user02
       - DST_FTP_SERVER1_PASS=Votmdnjem02!
+      # Local transfer configuration
+      - LOCAL_SERVER1_TYPE=local
+      - LOCAL_SERVER1_HOST=localhost
+      - LOCAL_SERVER1_PORT=0
+      - LOCAL_SERVER1_USER=
+      - LOCAL_SERVER1_PASS=
+      - LOCAL_SERVER1_BASE_PATH=/shared
     command: ["test-transfer", "test-group", "localhost:9092"]
     networks:
       - etl-test-net

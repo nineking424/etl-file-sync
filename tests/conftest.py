@@ -1,6 +1,7 @@
 """Pytest configuration and fixtures."""
 
 import os
+import shutil
 import socket
 import sys
 from pathlib import Path
@@ -116,6 +117,41 @@ def dest_config(test_env_file):
 
     config = ConfigLoader(test_env_file)
     return config.get_server_config("DST_FTP_SERVER1")
+
+
+# Local transfer fixtures for E2E tests
+SHARED_TEST_DIR = "/tmp/etl-test-shared"
+
+
+@pytest.fixture
+def shared_test_dir():
+    """Create shared directory for container-host file sharing.
+
+    This directory is mounted as a volume in docker-compose.test.yml:
+    Host: /tmp/etl-test-shared -> Container: /shared
+    """
+    src_dir = Path(SHARED_TEST_DIR) / "source"
+    dst_dir = Path(SHARED_TEST_DIR) / "destination"
+
+    # Clean and recreate directories
+    for d in [src_dir, dst_dir]:
+        if d.exists():
+            shutil.rmtree(d)
+        d.mkdir(parents=True)
+
+    yield {"source": src_dir, "destination": dst_dir}
+
+    # Cleanup after test
+    shutil.rmtree(SHARED_TEST_DIR, ignore_errors=True)
+
+
+@pytest.fixture
+def local_config(test_env_file):
+    """Get local transfer config."""
+    from etl.config import ConfigLoader
+
+    config = ConfigLoader(test_env_file)
+    return config.get_server_config("LOCAL_SERVER1")
 
 
 # =============================================================================
