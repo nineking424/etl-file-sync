@@ -1,42 +1,6 @@
 version: '3.8'
 
 services:
-  # Source FTP Server (Pure-FTPd)
-  ftp-source:
-    image: stilliard/pure-ftpd:hardened
-    container_name: ftp-source
-    environment:
-      - PUBLICHOST=localhost
-      - FTP_USER_NAME=srcuser
-      - FTP_USER_PASS=srcpass
-      - FTP_USER_HOME=/home/srcuser
-      - FTP_PASSIVE_PORTS=30000:30009
-    ports:
-      - "2121:21"
-      - "30000-30009:30000-30009"
-    volumes:
-      - ftp-source-data:/home/srcuser
-    networks:
-      - etl-test-net
-
-  # Destination FTP Server (Pure-FTPd)
-  ftp-dest:
-    image: stilliard/pure-ftpd:hardened
-    container_name: ftp-dest
-    environment:
-      - PUBLICHOST=localhost
-      - FTP_USER_NAME=dstuser
-      - FTP_USER_PASS=dstpass
-      - FTP_USER_HOME=/home/dstuser
-      - FTP_PASSIVE_PORTS=30100:30109
-    ports:
-      - "2122:21"
-      - "30100-30109:30100-30109"
-    volumes:
-      - ftp-dest-data:/home/dstuser
-    networks:
-      - etl-test-net
-
   # ETL File Sync (Kafka + Consumer)
   etl-file-sync:
     image: etl-file-sync:latest
@@ -44,34 +8,27 @@ services:
     ports:
       - "9092:9092"
     environment:
-      # FTP settings (use Docker network hostnames)
+      # FTP settings (use real FTP server)
       - FTP_PASSIVE_MODE=true
       - DLQ_TOPIC_SUFFIX=-dlq
       - SRC_FTP_SERVER1_TYPE=ftp
-      - SRC_FTP_SERVER1_HOST=ftp-source
+      - SRC_FTP_SERVER1_HOST=192.168.1.4
       - SRC_FTP_SERVER1_PORT=21
-      - SRC_FTP_SERVER1_USER=srcuser
-      - SRC_FTP_SERVER1_PASS=srcpass
+      - SRC_FTP_SERVER1_USER=user01
+      - SRC_FTP_SERVER1_PASS=Votmdnjem01!
       - DST_FTP_SERVER1_TYPE=ftp
-      - DST_FTP_SERVER1_HOST=ftp-dest
+      - DST_FTP_SERVER1_HOST=192.168.1.4
       - DST_FTP_SERVER1_PORT=21
-      - DST_FTP_SERVER1_USER=dstuser
-      - DST_FTP_SERVER1_PASS=dstpass
+      - DST_FTP_SERVER1_USER=user02
+      - DST_FTP_SERVER1_PASS=Votmdnjem02!
     command: ["test-transfer", "test-group", "localhost:9092"]
     networks:
       - etl-test-net
-    depends_on:
-      - ftp-source
-      - ftp-dest
     logging:
       driver: "json-file"
       options:
         max-size: "10m"
         max-file: "3"
-
-volumes:
-  ftp-source-data:
-  ftp-dest-data:
 
 networks:
   etl-test-net:
